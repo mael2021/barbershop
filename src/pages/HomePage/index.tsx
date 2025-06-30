@@ -30,7 +30,6 @@ export const HomePage = () => {
       <BookingForm
         isOpen={isBookingOpen}
         onClose={handleCloseBooking}
-        excludedServices={["Tatuajes"]}
         preSelectedService={selectedService}
       />
     </div>

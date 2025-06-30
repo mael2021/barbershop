@@ -12,13 +12,13 @@ export const Hero = ({ onBookingClick }: { onBookingClick: () => void }) => {
       <div className="z-10 flex flex-col items-center justify-center gap-8 text-center">
         <div className="animate-fade-in flex flex-col justify-center gap-6">
           <h1 className="font-anton leading-7 uppercase">
-            <span className="graffiti-shadow animate-gradient-shift bg-gradient-to-r from-electric-blue via-neon-green to-hot-pink bg-size-[400%_400%] bg-clip-text text-9xl text-transparent">
-              Thug
+            <span className="graffiti-shadow animate-gradient-shift bg-gradient-to-r from-electric-blue via-neon-green to-hot-pink bg-size-[400%_400%] bg-clip-text text-8xl text-transparent">
+              Master
             </span>
-            <span className="graffiti-shadow mt-2 block text-6xl text-white">Style</span>
+            <span className="graffiti-shadow mt-2 block text-6xl text-white">Cuts</span>
           </h1>
           <p className="text-center text-sm leading-tight font-bold tracking-wide text-pretty text-gray-300 uppercase">
-            Estilo auténtico, desde la navaja hasta la tinta.
+            ✂️ Estilo y elegancia en cada corte ✂️
           </p>
         </div>
         <div className="flex items-center justify-center gap-4">
@@ -34,7 +34,7 @@ export const Hero = ({ onBookingClick }: { onBookingClick: () => void }) => {
           Reservar ahora
         </button>
 
-        <p className="font-mono text-sm tracking-wider text-gray-400">HAIRCUTS • TATTOOS • BARBERING</p>
+        <p className="font-mono text-sm tracking-wider text-gray-400">🔥 CORTES • ESTILO • BARBERÍA 🔥</p>
       </div>
     </section>
   );

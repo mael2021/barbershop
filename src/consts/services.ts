@@ -29,12 +29,4 @@ export const services: Service[] = [
     duration: "20 min",
     image: "/images/services/beard.jpg",
   },
-  {
-    name: "Tatuajes",
-    description: "Servicio de tatuajes personalizado, disponible solo con cita previa.",
-    customPrice: "Según cotización",
-    isCustomPriced: true,
-    duration: "Variable",
-    image: "/images/services/tattoo.jpg",
-  },
 ];
