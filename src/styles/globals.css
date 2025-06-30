@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: Anton Regular;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Anton-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Montserrat Variable;
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/Montserrat-Variable.woff2") format("woff2");
+}
+
+@theme {
+  --color-electric-blue: #00d4ff;
+  --color-neon-green: #39ff14;
+  --color-hot-pink: #ff1493;
+  --color-graffiti-dark: #1a1a1a;
+  --color-graffiti-gray: #2d2d2d;
+  --color-urban-purple: #8b5cf6;
+  --color-spray-orange: #ff9e35;
+
+  --font-anton: "Anton Regular", sans-serif;
+  --font-sans: "Montserrat Variable", system-ui, sans-serif;
+
+  --graffiti-shadow: 3px 3px 0px #000, 6px 6px 0px rgba(0, 212, 255, 0.3);
+
+  --animate-gradient-shift: gradient-shift 3s ease infinite;
+
+  @keyframes gradient-shift {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+}
+
+.graffiti-shadow {
+  text-shadow: var(--graffiti-shadow);
+}
+
+.spray-effect {
+  position: relative;
+}
+
+.spray-effect::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 20, 147, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 80%, rgba(57, 255, 20, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.responsive-grid {
+  @apply grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4;
+}
