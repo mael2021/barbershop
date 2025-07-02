@@ -12,6 +12,7 @@ import { supabase } from "@/supabase/client";
 import { services } from "@/consts/services";
 import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 interface GoogleCalendarEvent {
   id: string;
@@ -35,7 +36,11 @@ interface BookingFormProps {
 
 const bookingFormSchema = z.object({
   services: z.array(z.string()).min(1, "Debes seleccionar al menos un servicio"),
-  date: z.string().min(1, "La fecha es requerida"),
+  date: z.string().min(1, "La fecha es requerida").refine((date) => {
+    const selectedDate = new Date(date + "T00:00:00");
+    const dayOfWeek = selectedDate.getDay();
+    return dayOfWeek !== 0; // 0 es domingo
+  }, "La barbería no abre los domingos"),
   time: z.string().min(1, "La hora es requerida"),
   name: z
     .string()
@@ -79,6 +84,15 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   });
 
   const formData = watch();
+
+  // Función para obtener la fecha mínima formateada
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   const timeSlots = [
     "10:00 AM",
@@ -580,7 +594,17 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 </div>
 
                 <div className="space-y-4">
-                  <div>
+                  {/* Calendario para escritorio */}
+                  <div className="hidden md:block">
+                    <CalendarComponent
+                      value={formData.date}
+                      onChange={(date) => setValue("date", date, { shouldValidate: true })}
+                      minDate={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+
+                  {/* Input de fecha para móvil */}
+                  <div className="md:hidden">
                     <Label className="font-bold text-white uppercase">Fecha</Label>
                     <Input
                       type="date"
@@ -588,10 +612,23 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
                         errors.date ? "border-red-500 focus-visible:ring-red-500" : ""
                       }`}
-                      min={new Date().toISOString().split("T")[0]}
+                      min={getTodayDate()}
+                      onInput={(e) => {
+                        const input = e.target as HTMLInputElement;
+                        const date = new Date(input.value + "T00:00:00");
+                        if (date.getDay() === 0) {
+                          input.value = "";
+                          setValue("date", "", { shouldValidate: true });
+                          toast.warning({
+                            text: "Domingos cerrado",
+                            description: "La barbería no abre los domingos. Por favor selecciona otro día.",
+                          });
+                        }
+                      }}
                     />
-                    {errors.date && <p className="mt-1 text-sm text-red-500">{errors.date.message}</p>}
                   </div>
+                  
+                  {errors.date && <p className="mt-1 text-sm text-red-500">{errors.date.message}</p>}
                 </div>
               </div>
             )}
