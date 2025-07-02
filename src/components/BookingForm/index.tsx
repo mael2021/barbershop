@@ -83,24 +83,17 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   const formData = watch();
 
   const timeSlots = [
-    "9:00 AM",
-    "9:30 AM",
     "10:00 AM",
-    "10:30 AM",
     "11:00 AM",
-    "11:30 AM",
     "12:00 PM",
-    "12:30 PM",
     "1:00 PM",
-    "1:30 PM",
     "2:00 PM",
-    "2:30 PM",
     "3:00 PM",
-    "3:30 PM",
     "4:00 PM",
-    "4:30 PM",
     "5:00 PM",
-    "5:30 PM",
+    "6:00 PM",
+    "7:00 PM",
+    "8:00 PM",
   ];
 
   // Función para añadir un servicio
@@ -208,8 +201,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       }
 
       if (!events || events.length === 0) {
+        console.log("No hay eventos para esta fecha");
         return new Set(timeSlots);
       }
+
+      console.log(`Eventos encontrados para ${date}:`, events);
 
       // Crear un conjunto con todos los horarios disponibles
       const availableSlots = new Set(timeSlots);
@@ -218,19 +214,61 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       events.forEach((event: GoogleCalendarEvent) => {
         const eventStartStr = event.start.dateTime || event.start.date;
         const eventEndStr = event.end.dateTime || event.end.date;
+        
         if (!eventStartStr || !eventEndStr) return;
+        
+        console.log(`Procesando evento: ${event.summary}`);
+        console.log(`Inicio: ${eventStartStr}, Fin: ${eventEndStr}`);
+        
         const eventStart = new Date(eventStartStr);
         const eventEnd = new Date(eventEndStr);
+        
         timeSlots.forEach(time => {
-          const [hours, minutes, period] = time.match(/(\d+):(\d+)\s*(AM|PM)/)?.slice(1) || [];
-          const slotHour = parseInt(hours) + (period === "PM" && hours !== "12" ? 12 : 0);
+          // Mejorar el parsing del horario
+          const timeMatch = time.match(/(\d+):(\d+)\s*(AM|PM)/);
+          if (!timeMatch) return;
+          
+          const [, hours, minutes, period] = timeMatch;
+          let slotHour = parseInt(hours);
           const slotMinute = parseInt(minutes);
+          
+          // Convertir a formato 24 horas correctamente
+          if (period === "AM" && slotHour === 12) {
+            slotHour = 0; // 12:00 AM = 00:00
+          } else if (period === "PM" && slotHour !== 12) {
+            slotHour += 12; // PM pero no 12:00 PM
+          }
+          // 12:00 PM = 12:00 (no se modifica)
+          
+          // Crear la fecha del slot en la zona horaria local
           const slotTime = new Date(year, month - 1, day, slotHour, slotMinute);
-          if (slotTime >= eventStart && slotTime < eventEnd) {
+          const slotEndTime = new Date(year, month - 1, day, slotHour + 1, slotMinute); // Slots de 1 hora
+          
+          console.log(`Comparando slot ${time} (${slotTime.toISOString()}) con evento ${eventStart.toISOString()} - ${eventEnd.toISOString()}`);
+          
+          // Verificar si hay superposición entre el slot y el evento
+          // Un slot está ocupado si:
+          // 1. El inicio del slot está dentro del evento
+          // 2. El final del slot está dentro del evento  
+          // 3. El evento está completamente dentro del slot
+          // 4. El slot está completamente dentro del evento
+          const isOverlapping = (
+            (slotTime >= eventStart && slotTime < eventEnd) || // Inicio del slot en el evento
+            (slotEndTime > eventStart && slotEndTime <= eventEnd) || // Final del slot en el evento
+            (slotTime <= eventStart && slotEndTime >= eventEnd) || // Evento dentro del slot
+            (slotTime >= eventStart && slotEndTime <= eventEnd) // Slot dentro del evento
+          );
+          
+          if (isOverlapping) {
+            console.log(`❌ Slot ${time} no disponible - se superpone con evento`);
             availableSlots.delete(time);
+          } else {
+            console.log(`✅ Slot ${time} disponible`);
           }
         });
       });
+      
+      console.log("Horarios disponibles:", Array.from(availableSlots));
       return availableSlots;
     } catch (error) {
       console.error("Error al consultar disponibilidad:", error);
@@ -342,10 +380,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       // Crear la fecha de inicio
       const startDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
 
-      // Crear la fecha de fin (30 minutos después)
-      const endMinute = (minute + 30) % 60;
-      const endHour = minute + 30 >= 60 ? (hour + 1) % 24 : hour;
-      const endDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}:00`;
+      // Crear la fecha de fin (1 hora después)
+      const endHour = (hour + 1) % 24;
+      const endDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(endHour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
 
       const event = {
         summary: `Cita: ${data.services.join(", ")}`,
@@ -570,13 +607,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <Clock className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="mb-2 text-2xl font-bold text-white">Selecciona tu hora</h3>
-                  <p className="text-white">Nuestros horarios disponibles</p>
+                  <p className="text-white">Horarios disponibles (citas de 1 hora)</p>
                 </div>
 
                 {isLoadingSlots ? (
                   <div className="text-center text-white">Cargando horarios disponibles...</div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {timeSlots.map(time => {
                       const isAvailable = availableSlots.has(time);
                       return (
