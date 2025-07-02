@@ -10,16 +10,13 @@ export const Hero = ({ onBookingClick }: { onBookingClick: () => void }) => {
       </div>
 
       <div className="z-10 flex flex-col items-center justify-center gap-8 text-center">
-        <div className="animate-fade-in flex flex-col justify-center gap-6">
+        <div className="animate-fade-in flex flex-col justify-center gap-4">
           <h1 className="font-anton leading-7 uppercase">
             <span className="graffiti-shadow animate-gradient-shift bg-gradient-to-r from-electric-blue via-neon-green to-hot-pink bg-size-[400%_400%] bg-clip-text text-8xl text-transparent">
               Master
             </span>
-            <span className="graffiti-shadow mt-2 block text-6xl text-white">Cuts</span>
+            <span className="graffiti-shadow mt-1 block text-6xl text-white">Cuts</span>
           </h1>
-          <p className="text-center text-sm leading-tight font-bold tracking-wide text-pretty text-gray-300 uppercase">
-            ✂️ Estilo y elegancia en cada corte ✂️
-          </p>
         </div>
         <div className="flex items-center justify-center gap-4">
           <div className="h-8 w-1 bg-gradient-to-b from-electric-blue to-transparent"></div>

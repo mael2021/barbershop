@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, User, Phone, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Clock, User, Phone, X, ChevronLeft, ChevronRight, Plus, Minus } from "lucide-react";
 import { supabase } from "@/supabase/client";
 import { services } from "@/consts/services";
 import { toast } from "@pheralb/toast";
@@ -34,7 +34,7 @@ interface BookingFormProps {
 }
 
 const bookingFormSchema = z.object({
-  service: z.string().min(1, "El servicio es requerido"),
+  services: z.array(z.string()).min(1, "Debes seleccionar al menos un servicio"),
   date: z.string().min(1, "La fecha es requerida"),
   time: z.string().min(1, "La hora es requerida"),
   name: z
@@ -56,6 +56,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [isCurrentStepValid, setIsCurrentStepValid] = useState(false);
   const serviceSetRef = useRef(false);
 
   const {
@@ -70,7 +71,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     resolver: zodResolver(bookingFormSchema),
     mode: "onTouched",
     defaultValues: {
-      service: "",
+      services: [],
       date: "",
       time: "",
       name: "",
@@ -102,13 +103,36 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "5:30 PM",
   ];
 
+  // Función para añadir un servicio
+  const addService = (serviceName: string) => {
+    const currentServices = formData.services || [];
+    if (!currentServices.includes(serviceName)) {
+      setValue("services", [...currentServices, serviceName], { shouldValidate: true });
+    }
+  };
+
+  // Función para remover un servicio
+  const removeService = (serviceName: string) => {
+    const currentServices = formData.services || [];
+    setValue("services", currentServices.filter(s => s !== serviceName), { shouldValidate: true });
+  };
+
+  // Función para obtener el precio total
+  const getTotalPrice = () => {
+    const selectedServices = formData.services || [];
+    return selectedServices.reduce((total, serviceName) => {
+      const service = services.find(s => s.name === serviceName);
+      return total + (service?.price || 0);
+    }, 0);
+  };
+
   // Memoize validateCurrentStep to avoid infinite loops
   const validateCurrentStep = useCallback(async () => {
     let isValid = false;
 
     switch (currentStep) {
       case 1:
-        isValid = Boolean(formData.service);
+        isValid = Boolean(formData.services && formData.services.length > 0);
         break;
       case 2:
         isValid = Boolean(formData.date);
@@ -122,7 +146,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     }
 
     setIsCurrentStepValid(isValid);
-  }, [currentStep, formData.service, formData.date, formData.time, formData.name, formData.phone, formData.email]);
+  }, [currentStep, formData.services, formData.date, formData.time, formData.name, formData.phone, formData.email]);
 
   // Efecto para validar cuando cambia el paso o los datos
   useEffect(() => {
@@ -131,8 +155,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
   // Efecto para manejar el servicio preseleccionado
   useEffect(() => {
-    if (isOpen && preSelectedService) {
-      setValue("service", preSelectedService, { shouldValidate: true });
+    if (isOpen && preSelectedService && !serviceSetRef.current) {
+      setValue("services", [preSelectedService], { shouldValidate: true });
       serviceSetRef.current = true;
       validateCurrentStep();
     }
@@ -142,7 +166,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   useEffect(() => {
     if (!isOpen) {
       reset({
-        service: "",
+        services: [],
         date: "",
         time: "",
         name: "",
@@ -241,7 +265,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
     switch (currentStep) {
       case 1:
-        isValid = await trigger("service");
+        isValid = await trigger("services");
         break;
       case 2:
         isValid = await trigger("date");
@@ -263,8 +287,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
-  const [isCurrentStepValid, setIsCurrentStepValid] = useState(false);
-
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
 
@@ -285,7 +307,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         .from("reservations")
         .insert([
           {
-            service: data.service,
+            services: data.services,
             date: data.date,
             time: data.time,
             customer_name: data.name,
@@ -338,7 +360,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         const endDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}:00`;
 
         const event = {
-          summary: `Cita: ${data.service}`,
+          summary: `Cita: ${data.services.join(", ")}`,
           description: `Cliente: ${data.name}\nTeléfono: ${data.phone}\nEmail: ${data.email}`,
           start: {
             dateTime: startDateTime,
@@ -431,32 +453,90 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-spray-orange to-electric-blue">
                     <Calendar className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="mb-2 text-2xl font-bold text-white">Elige tu servicio</h3>
-                  <p className="text-white">¿Qué estilo vamos a elegir hoy?</p>
+                  <h3 className="mb-2 text-2xl font-bold text-white">Elige tus servicios</h3>
+                  <p className="text-white">¿Qué estilos vamos a elegir hoy?</p>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="font-bold text-white uppercase">Servicio</Label>
-                  <Select
-                    value={formData.service || preSelectedService || ""}
-                    onValueChange={value => {
-                      setValue("service", value, { shouldValidate: true });
-                    }}
-                  >
-                    <SelectTrigger className="border-gray-600 bg-graffiti-dark text-white uppercase">
-                      <SelectValue placeholder="Elige un servicio" />
-                    </SelectTrigger>
-                    <SelectContent className="border-gray-600 bg-graffiti-dark">
-                      {services
-                        .filter(service => !excludedServices.includes(service.name))
-                        .map(({ name, price }) => (
-                          <SelectItem key={name} value={name} className="text-white uppercase hover:bg-gray-600">
-                            {name} - ${price} MXN
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.service && <p className="mt-1 text-sm text-red-500">{errors.service.message}</p>}
+                <div className="space-y-4">
+                  {/* Servicios seleccionados */}
+                  {formData.services && formData.services.length > 0 ? (
+                    <div className="space-y-3">
+                      {formData.services.map((serviceName) => {
+                        const service = services.find(s => s.name === serviceName);
+                        return (
+                          <div key={serviceName} className="flex items-center justify-between rounded-lg border border-gray-600 bg-graffiti-dark p-4">
+                            <div>
+                              <h5 className="font-bold text-white uppercase">{serviceName}</h5>
+                              <div className="flex items-center gap-4 text-sm text-gray-400">
+                                <span>${service?.price} MXN</span>
+                                <span>{service?.duration}</span>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeService(serviceName)}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Total */}
+                      <div className="rounded-lg border border-spray-orange/30 bg-spray-orange/5 p-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-white font-medium">Total:</span>
+                          <span className="text-spray-orange font-bold text-lg">${getTotalPrice()} MXN</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center p-8 text-gray-400">
+                      <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                      <p>No has seleccionado ningún servicio</p>
+                    </div>
+                  )}
+
+                  {/* Botón para agregar servicio */}
+                  <div className="text-center">
+                    <Select
+                      value=""
+                      onValueChange={(value) => {
+                        if (value) addService(value);
+                      }}
+                    >
+                      <SelectTrigger className="border-gray-600 bg-graffiti-dark text-white hover:border-spray-orange transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Plus className="h-4 w-4 text-spray-orange" />
+                          <span>Agregar servicio</span>
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="border-gray-600 bg-graffiti-dark">
+                        {services
+                          .filter(service => 
+                            !excludedServices.includes(service.name) && 
+                            !formData.services?.includes(service.name)
+                          )
+                          .map((service) => (
+                            <SelectItem 
+                              key={service.name} 
+                              value={service.name} 
+                              className="text-white hover:bg-gray-600 focus:bg-gray-600"
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{service.name}</span>
+                                <span className="text-sm text-gray-400">${service.price} MXN • {service.duration}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {errors.services && <p className="mt-1 text-sm text-red-500">{errors.services.message}</p>}
                 </div>
               </div>
             )}
@@ -597,7 +677,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 </div>
 
                 {/* Booking Summary */}
-                <BookingSummary service={formData.service} date={formData.date} time={formData.time} />
+                <BookingSummary services={formData.services} date={formData.date} time={formData.time} />
               </div>
             )}
 
