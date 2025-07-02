@@ -67,7 +67,6 @@ export const services: Service[] = [
   {
     name: "Grecas",
     description: "Diseños artísticos rasurados o dibujados en los laterales o parte posterior del cabello.",
-    price: 0,
     duration: "15 min",
     image: "/images/services/grecas.jpg",
     isCustomPriced: true,
