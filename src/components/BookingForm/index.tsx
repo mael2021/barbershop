@@ -326,82 +326,73 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         return;
       }
 
-      // Obtener el token almacenado
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      // Crear evento en Google Calendar usando la función edge
+      const timeMatch = data.time.match(/(\d+):(\d+)\s*(AM|PM)/);
+      if (!timeMatch) {
+        throw new Error("Formato de hora inválido");
+      }
+
+      const [hours, minutes, period] = timeMatch.slice(1);
+      const hour = parseInt(hours) + (period === "PM" && hours !== "12" ? 12 : 0);
+      const minute = parseInt(minutes);
+
+      // Asegurarnos de que la fecha se mantenga exactamente como la seleccionó el usuario
+      const [year, month, day] = data.date.split("-").map(Number);
+
+      // Crear la fecha de inicio
+      const startDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+
+      // Crear la fecha de fin (30 minutos después)
+      const endMinute = (minute + 30) % 60;
+      const endHour = minute + 30 >= 60 ? (hour + 1) % 24 : hour;
+      const endDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}:00`;
+
+      const event = {
+        summary: `Cita: ${data.services.join(", ")}`,
+        description: `Cliente: ${data.name}\nTeléfono: ${data.phone}\nEmail: ${data.email}`,
+        start: {
+          dateTime: startDateTime,
+          timeZone: "America/Mexico_City",
         },
-        body: JSON.stringify({ 
-          action: "retrieve" 
-        }),
-      });
+        end: {
+          dateTime: endDateTime,
+          timeZone: "America/Mexico_City",
+        },
+      };
 
-      const { token } = await response.json();
-      if (token) {
-        // Create event in Google Calendar
-        const timeMatch = data.time.match(/(\d+):(\d+)\s*(AM|PM)/);
-        if (!timeMatch) {
-          throw new Error("Formato de hora inválido");
+      try {
+        const calendarResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "create_event",
+            event_data: event,
+          }),
+        });
+
+        if (!calendarResponse.ok) {
+          const errorData = await calendarResponse.json();
+          console.error("Error creating Google Calendar event:", errorData);
+          throw new Error(errorData.error || "Error al crear evento en Google Calendar");
         }
 
-        const [hours, minutes, period] = timeMatch.slice(1);
-        const hour = parseInt(hours) + (period === "PM" && hours !== "12" ? 12 : 0);
-        const minute = parseInt(minutes);
-
-        // Asegurarnos de que la fecha se mantenga exactamente como la seleccionó el usuario
-        const [year, month, day] = data.date.split("-").map(Number);
-
-        // Crear la fecha de inicio
-        const startDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
-
-        // Crear la fecha de fin (30 minutos después)
-        const endMinute = (minute + 30) % 60;
-        const endHour = minute + 30 >= 60 ? (hour + 1) % 24 : hour;
-        const endDateTime = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}:00`;
-
-        const event = {
-          summary: `Cita: ${data.services.join(", ")}`,
-          description: `Cliente: ${data.name}\nTeléfono: ${data.phone}\nEmail: ${data.email}`,
-          start: {
-            dateTime: startDateTime,
-            timeZone: "America/Mexico_City",
-          },
-          end: {
-            dateTime: endDateTime,
-            timeZone: "America/Mexico_City",
-          },
-        };
-
-        try {
-          const calendarResponse = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(event),
-          });
-
-          if (!calendarResponse.ok) {
-            const errorData = await calendarResponse.json();
-            console.error("Error creating Google Calendar event:", errorData);
-            throw new Error(errorData.error?.message || "Error al crear evento en Google Calendar");
-          }
-        } catch (calendarError) {
-          console.error("Error creating Google Calendar event:", calendarError);
-          toast.warning({
-            text: "Reserva creada, pero hubo un error al sincronizar con Google Calendar",
-            description:
-              "La reserva se ha guardado correctamente, pero no se pudo crear en el calendario. Por favor, contacta al administrador.",
-          });
-        }
+        const result = await calendarResponse.json();
+        console.log("Evento creado exitosamente:", result);
+      } catch (calendarError) {
+        console.error("Error creating Google Calendar event:", calendarError);
+        toast.warning({
+          text: "Reserva creada, pero hubo un error al sincronizar con Google Calendar",
+          description:
+            "La reserva se ha guardado correctamente, pero no se pudo crear en el calendario. Por favor, contacta al administrador.",
+        });
       }
 
       toast.success({
         text: "¡Reserva confirmada! 🔥",
-        description: "Tu cita ha sido agendada. ¡Te vemos en Thug Style!",
+        description: "Tu cita ha sido agendada. ¡Te vemos en Master Cuts!",
       });
 
       onClose();
