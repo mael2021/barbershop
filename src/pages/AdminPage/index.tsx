@@ -3,58 +3,51 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/supabase/client";
 import { GOOGLE_CALENDAR_SCOPES } from "@/lib/google";
 import { toast } from "@pheralb/toast";
+import { Trash2 } from "lucide-react";
 
 export const AdminPage = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLinked, setIsLinked] = useState(false);
 
   useEffect(() => {
-    const checkAndStoreTokens = async () => {
+    const handleAuthCallback = async () => {
       try {
-        // Verificar si hay un hash en la URL (después del login)
-        const hash = window.location.hash;
-        if (hash) {
-          console.log("[DEBUG] Hash completo:", hash);
-          const params = new URLSearchParams(hash.replace(/^#/, ""));
-          const refresh_token = params.get("provider_refresh_token");
-          console.log("[DEBUG] Provider refresh token encontrado:", refresh_token);
+        // Obtener la sesión actual
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("[DEBUG] Error al obtener la sesión:", sessionError);
+          setIsLoading(false);
+          return;
+        }
 
-          if (!refresh_token || !refresh_token.startsWith("1//")) {
-            console.log("[DEBUG] No se encontró un provider refresh token válido");
-            return;
-          }
-
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (!session?.provider_token) {
-            console.log("[DEBUG] No se encontró el provider token");
-            return;
-          }
-
-          console.log("[DEBUG] Enviando tokens a la Edge Function");
+        if (session?.provider_token && session?.provider_refresh_token) {
+          console.log("[DEBUG] Tokens encontrados en la sesión, guardando...");
+          
+          // Almacenar los tokens en la base de datos
           const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
               action: "store",
               token: session.provider_token,
-              refresh_token,
+              refresh_token: session.provider_refresh_token,
             }),
           });
 
-          console.log("[DEBUG] Respuesta de la Edge Function:", response.status);
           if (response.ok) {
+            const result = await response.json();
+            console.log("[DEBUG] Tokens guardados exitosamente:", result);
             setIsLinked(true);
             toast.success({
-              text: "¡Tokens guardados correctamente! 🎉",
-              description: "Los tokens de Google Calendar han sido guardados exitosamente.",
+              text: "¡Cuenta vinculada exitosamente! 🎉",
+              description: "Tu cuenta de Google Calendar ha sido vinculada correctamente.",
             });
-            // Limpiar el fragmento de la URL
-            window.location.hash = "";
+            // Limpiar la URL
+            window.history.replaceState(null, '', window.location.pathname);
           } else {
             const errorData = await response.json();
             console.error("[DEBUG] Error al guardar tokens:", errorData);
@@ -64,27 +57,104 @@ export const AdminPage = () => {
             });
           }
         } else {
-          // Si no hay hash, solo verificamos si ya está vinculado
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          setIsLinked(!!session?.provider_token);
+          // No hay tokens de proveedor, verificar si ya existe una vinculación
+          await checkExistingLink();
         }
       } catch (error) {
-        console.error("[DEBUG] Error en checkAndStoreTokens:", error);
+        console.error("[DEBUG] Error en handleAuthCallback:", error);
         toast.error({
           text: "Error al verificar la vinculación",
           description: "Ocurrió un error al verificar el estado de la vinculación.",
         });
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    checkAndStoreTokens();
+    const checkExistingLink = async () => {
+      try {
+        console.log("[DEBUG] Verificando vinculación existente...");
+        
+        // Obtener el JWT del usuario actual
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setIsLinked(false);
+          return;
+        }
+        
+        // Verificar si existen tokens en la base de datos
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "retrieve",
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setIsLinked(!!result.token);
+          console.log("[DEBUG] Estado de vinculación:", !!result.token);
+        } else {
+          console.log("[DEBUG] No hay tokens guardados");
+          setIsLinked(false);
+        }
+      } catch (error) {
+        console.error("[DEBUG] Error al verificar vinculación existente:", error);
+        setIsLinked(false);
+      }
+    };
+
+    handleAuthCallback();
+
+    // Escuchar cambios en la autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[DEBUG] Auth state changed:", event, session?.provider_token ? "has_provider_token" : "no_provider_token");
+      
+      if (event === 'SIGNED_IN' && session?.provider_token && session?.provider_refresh_token) {
+        // Nuevo login exitoso con tokens
+        try {
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action: "store",
+              token: session.provider_token,
+              refresh_token: session.provider_refresh_token,
+            }),
+          });
+
+          if (response.ok) {
+            setIsLinked(true);
+            toast.success({
+              text: "¡Cuenta vinculada exitosamente! 🎉",
+              description: "Tu cuenta de Google Calendar ha sido vinculada correctamente.",
+            });
+          }
+        } catch (error) {
+          console.error("[DEBUG] Error storing tokens:", error);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setIsLinked(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
+      console.log("[DEBUG] Iniciando proceso de autenticación con Google");
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -92,7 +162,6 @@ export const AdminPage = () => {
           queryParams: {
             access_type: "offline",
             prompt: "consent",
-            response_type: "code",
           },
           redirectTo: `${window.location.origin}/admin`,
         },
@@ -104,13 +173,63 @@ export const AdminPage = () => {
           text: "Error al conectar con Google",
           description: `Detalles del error: ${error.message}. Por favor, intenta nuevamente.`,
         });
-        return;
       }
     } catch (error) {
       console.error("[DEBUG] Error durante la autenticación:", error);
       toast.error({
         text: "Error al conectar con Google",
         description: "Ocurrió un error durante el proceso de autenticación.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnlink = async () => {
+    setIsLoading(true);
+    try {
+      console.log("[DEBUG] Desvinculando cuenta...");
+      
+      // Obtener el JWT del usuario actual
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("No hay una sesión activa");
+      }
+      
+      // Eliminar tokens de la base de datos
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "store",
+          token: null,
+          refresh_token: null,
+        }),
+      });
+
+      if (response.ok) {
+        setIsLinked(false);
+        toast.success({
+          text: "Cuenta desvinculada",
+          description: "Se ha eliminado la conexión con Google Calendar.",
+        });
+        
+        // También cerrar sesión de Supabase
+        await supabase.auth.signOut();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al desvincular en el servidor");
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido";
+      console.error("[DEBUG] Error al desvincular:", error);
+      toast.error({
+        text: "Error al desvincular",
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -126,10 +245,27 @@ export const AdminPage = () => {
         </div>
 
         <div className="mt-8">
-          {isLinked ? (
-            <div className="text-center text-green-400">
-              <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
-              <p className="mt-2 text-sm text-gray-300">La cuenta de Google Calendar está correctamente configurada.</p>
+          {isLoading ? (
+            <div className="text-center text-white">
+              <p>Verificando estado de vinculación...</p>
+            </div>
+          ) : isLinked ? (
+            <div className="space-y-4 text-center">
+              <div className="text-green-400">
+                <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
+                <p className="mt-2 text-sm text-gray-300">
+                  La cuenta de Google Calendar está correctamente configurada.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleUnlink}
+                disabled={isLoading}
+                className="w-full bg-red-600 text-white hover:bg-red-700"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
+              </Button>
             </div>
           ) : (
             <Button
@@ -140,6 +276,15 @@ export const AdminPage = () => {
               {isLoading ? "Conectando..." : "Vincular cuenta de Google Calendar"}
             </Button>
           )}
+        </div>
+
+        <div className="mt-6 text-center">
+          <a
+            href="/"
+            className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+          >
+            ← Volver al inicio
+          </a>
         </div>
       </div>
     </div>

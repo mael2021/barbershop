@@ -333,7 +333,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ action: "retrieve" }),
+        body: JSON.stringify({ 
+          action: "retrieve" 
+        }),
       });
 
       const { token } = await response.json();
