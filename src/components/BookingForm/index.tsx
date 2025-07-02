@@ -46,7 +46,6 @@ const bookingFormSchema = z.object({
     .min(1, "El teléfono es requerido")
     .regex(/^[0-9]{10}$/, "Ingresa un número de teléfono válido (10 dígitos)")
     .transform(val => val.replace(/\D/g, "")),
-  email: z.string().min(1, "El email es requerido").email("Ingresa un email válido"),
 });
 
 type BookingFormData = z.infer<typeof bookingFormSchema>;
@@ -76,7 +75,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       time: "",
       name: "",
       phone: "",
-      email: "",
     },
   });
 
@@ -134,12 +132,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         isValid = Boolean(formData.time);
         break;
       case 4:
-        isValid = Boolean(formData.name && formData.phone && formData.email);
+        isValid = Boolean(formData.name && formData.phone);
         break;
     }
 
     setIsCurrentStepValid(isValid);
-  }, [currentStep, formData.services, formData.date, formData.time, formData.name, formData.phone, formData.email]);
+  }, [currentStep, formData.services, formData.date, formData.time, formData.name, formData.phone]);
 
   // Efecto para validar cuando cambia el paso o los datos
   useEffect(() => {
@@ -164,7 +162,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         time: "",
         name: "",
         phone: "",
-        email: "",
       });
       serviceSetRef.current = false;
       setCurrentStep(1);
@@ -312,7 +309,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         isValid = await trigger("time");
         break;
       case 4:
-        isValid = await trigger(["name", "phone", "email"]);
+        isValid = await trigger(["name", "phone"]);
         break;
     }
 
@@ -350,7 +347,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             time: data.time,
             customer_name: data.name,
             phone: data.phone,
-            email: data.email,
+            email: "no-email@barberia.com", // Valor por defecto
             status: "confirmed",
           },
         ])
@@ -386,7 +383,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       const event = {
         summary: `Cita: ${data.services.join(", ")}`,
-        description: `Cliente: ${data.name}\nTeléfono: ${data.phone}\nEmail: ${data.email}`,
+        description: `Cliente: ${data.name}\nTeléfono: ${data.phone}`,
         start: {
           dateTime: startDateTime,
           timeZone: "America/Mexico_City",
@@ -685,23 +682,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     />
                     {errors.phone && touchedFields.phone && (
                       <p className="mt-1 text-sm text-red-500">{errors.phone.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="font-bold text-white uppercase">Email</Label>
-                    <Input
-                      type="email"
-                      {...register("email", {
-                        onBlur: () => trigger("email"),
-                      })}
-                      placeholder="tu@email.com"
-                      className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
-                        errors.email && touchedFields.email ? "border-red-500 focus-visible:ring-red-500" : ""
-                      }`}
-                    />
-                    {errors.email && touchedFields.email && (
-                      <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>
                     )}
                   </div>
                 </div>

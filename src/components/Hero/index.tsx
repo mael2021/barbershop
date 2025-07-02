@@ -9,7 +9,7 @@ export const Hero = ({ onBookingClick }: { onBookingClick: () => void }) => {
         <div className="absolute top-1/2 left-1/3 h-24 w-24 rounded-full bg-neon-green blur-2xl"></div>
       </div>
 
-      <div className="z-10 flex flex-col items-center justify-center gap-8 text-center">
+      <div className="z-10 flex flex-col items-center justify-center gap-8 text-center pb-16">
         <div className="animate-fade-in flex flex-col justify-center gap-4">
           <h1 className="font-anton leading-7 uppercase">
             <span className="graffiti-shadow animate-gradient-shift bg-gradient-to-r from-electric-blue via-neon-green to-hot-pink bg-size-[400%_400%] bg-clip-text text-8xl text-transparent">
