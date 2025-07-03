@@ -13,7 +13,6 @@ import { services } from "@/consts/services";
 import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { tokenManager } from "@/lib/tokenManager";
 
 interface GoogleCalendarEvent {
   id: string;
@@ -256,31 +255,43 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
       const dayEnd = new Date(year, month - 1, day, 23, 59, 59).toISOString();
 
-      // Usar tokenManager para hacer la llamada con refresh automático
-      const events = await tokenManager.callWithTokenRefresh<any>(async () => {
-        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: "get_events",
-            timeMin: dayStart,
-            timeMax: dayEnd,
-            timeZone: "America/Mexico_City",
-          }),
-        });
+      // Hacer la llamada directa a la función edge
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "get_events",
+          timeMin: dayStart,
+          timeMax: dayEnd,
+          timeZone: "America/Mexico_City",
+        }),
       });
 
-      if (!events || events.error) {
-        console.error("Error al obtener eventos:", events?.error);
-        return filterPastTimeSlots(date, new Set(timeSlots)); // Si hay error, filtrar solo horarios pasados
+      // Verificar si la respuesta es exitosa
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error al obtener eventos:", errorData);
+        
+        // Manejar específicamente el error de re-autenticación requerida
+        if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
+          console.log("Se requiere re-autenticación del administrador");
+          toast.warning({
+            text: "Problema de sincronización",
+            description: "Hay un problema con la conexión a Google Calendar. Los horarios mostrados pueden no estar actualizados.",
+          });
+        }
+        
+        // En caso de error, mostrar todos los horarios disponibles filtrados
+        return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
-      if (!events.events || events.events.length === 0) {
+      const events = await response.json();
+
+      if (!events || !events.events) {
         console.log("No hay eventos para esta fecha");
-        // Aún necesitamos filtrar horarios pasados si es hoy
         return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
@@ -492,22 +503,38 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             description: "La reserva se guardó correctamente, pero no se sincronizó con Google Calendar. Contacta al administrador.",
           });
         } else {
-          // Usar tokenManager para crear el evento con refresh automático
-          const result = await tokenManager.callWithTokenRefresh<any>(async () => {
-            return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({
-                action: "create_event",
-                event_data: event,
-              }),
-            });
+          // Hacer la llamada directa a la función edge
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              action: "create_event",
+              event_data: event,
+            }),
           });
 
-          console.log("Evento creado exitosamente:", result);
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Error al crear evento en Google Calendar:", errorData);
+            
+            if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
+              toast.warning({
+                text: "Reserva creada con advertencia",
+                description: "La reserva se guardó correctamente, pero hay un problema con la sincronización de Google Calendar. Contacta al administrador.",
+              });
+            } else {
+              toast.warning({
+                text: "Reserva creada, pero hubo un error al sincronizar con Google Calendar",
+                description: "La reserva se ha guardado correctamente, pero no se pudo crear en el calendario. Por favor, contacta al administrador.",
+              });
+            }
+          } else {
+            const result = await response.json();
+            console.log("Evento creado exitosamente:", result);
+          }
         }
       } catch (calendarError) {
         console.error("Error creating Google Calendar event:", calendarError);

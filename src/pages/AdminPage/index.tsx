@@ -222,7 +222,14 @@ export const AdminPage = () => {
         body: JSON.stringify({ action: "check_token_status" }),
       });
 
+      if (!response.ok) {
+        console.error("Error al verificar estado del token:", response.status);
+        return;
+      }
+
       const data = await response.json();
+      console.log("[DEBUG] Estado del token:", data);
+      
       if (data.status === 'reauth_required') {
         setIsLinked(false);
         toast.error({
@@ -299,6 +306,8 @@ export const AdminPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Error al obtener eventos:", errorData);
+        
         // Handle token expiration gracefully
         if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
             setIsLinked(false);
@@ -306,7 +315,9 @@ export const AdminPage = () => {
                 text: "Conexión Expirada",
                 description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
             });
+            return;
         }
+        
         throw new Error(errorData.error || "No se pudieron cargar las citas");
       }
 
@@ -342,7 +353,7 @@ export const AdminPage = () => {
         throw new Error("No hay sesión activa");
       }
 
-      // Obtener el token de Google Calendar directamente sin TokenManager
+      // Obtener el token de Google Calendar directamente de la función edge
       const tokenResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
         method: "POST",
         headers: {
@@ -356,6 +367,17 @@ export const AdminPage = () => {
 
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json();
+        console.error("Error al obtener token:", errorData);
+        
+        if (errorData.error === 'REAUTH_REQUIRED' || errorData.error === 'ADMIN_REAUTH_REQUIRED') {
+          setIsLinked(false);
+          toast.error({
+            text: "Conexión Expirada",
+            description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
+          });
+          return;
+        }
+        
         throw new Error(`Error al obtener token: ${errorData.error || tokenResponse.status}`);
       }
 
@@ -383,6 +405,17 @@ export const AdminPage = () => {
           });
           return;
         }
+        
+        if (deleteResponse.status === 401) {
+          // Token expirado
+          setIsLinked(false);
+          toast.error({
+            text: "Conexión Expirada",
+            description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
+          });
+          return;
+        }
+        
         throw new Error(`Error al eliminar evento: ${deleteResponse.status}`);
       }
 
