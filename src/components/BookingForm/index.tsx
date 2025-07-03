@@ -244,6 +244,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad en Google Calendar
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
+      // Verificar si hay una sesión activa antes de hacer la llamada
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log("No hay sesión activa, mostrando todos los horarios como disponibles");
+        return filterPastTimeSlots(date, new Set(timeSlots));
+      }
+
       // Calcular timeMin y timeMax para el día seleccionado
       const [year, month, day] = date.split("-").map(Number);
       const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
@@ -255,7 +262,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             action: "get_events",
@@ -268,7 +275,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (!events || events.error) {
         console.error("Error al obtener eventos:", events?.error);
-        return new Set(timeSlots); // Si hay error, todos los horarios están disponibles
+        return filterPastTimeSlots(date, new Set(timeSlots)); // Si hay error, filtrar solo horarios pasados
       }
 
       if (!events.events || events.events.length === 0) {
@@ -476,22 +483,32 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       };
 
       try {
-        // Usar tokenManager para crear el evento con refresh automático
-        const result = await tokenManager.callWithTokenRefresh<any>(async () => {
-          return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              action: "create_event",
-              event_data: event,
-            }),
+        // Verificar si hay una sesión activa antes de crear el evento
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("No hay sesión activa, omitiendo creación de evento en Google Calendar");
+          toast.warning({
+            text: "Reserva creada sin sincronización",
+            description: "La reserva se guardó correctamente, pero no se sincronizó con Google Calendar. Contacta al administrador.",
           });
-        });
+        } else {
+          // Usar tokenManager para crear el evento con refresh automático
+          const result = await tokenManager.callWithTokenRefresh<any>(async () => {
+            return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                action: "create_event",
+                event_data: event,
+              }),
+            });
+          });
 
-        console.log("Evento creado exitosamente:", result);
+          console.log("Evento creado exitosamente:", result);
+        }
       } catch (calendarError) {
         console.error("Error creating Google Calendar event:", calendarError);
         toast.warning({
