@@ -28,10 +28,23 @@ export const AdminPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [codeError, setCodeError] = useState("");
+  const [rememberCode, setRememberCode] = useState(false);
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [deletingAppointment, setDeletingAppointment] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    // Verificar si hay un código de acceso guardado
+    const storedCode = localStorage.getItem('adminAccessCode');
+    if (storedCode === "cris2025F") {
+      setIsAuthenticated(true);
+      toast.success({
+        text: "Acceso automático",
+        description: "Bienvenido de nuevo al panel de administración.",
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -245,6 +258,11 @@ export const AdminPage = () => {
       });
       // Cargar citas del día cuando se autentica
       loadTodayAppointments();
+      
+      // Guardar el código si "Recordar" está marcado
+      if (rememberCode) {
+        localStorage.setItem('adminAccessCode', accessCode);
+      }
     } else {
       setCodeError("Código incorrecto. Inténtalo nuevamente.");
       setAccessCode("");
@@ -444,13 +462,17 @@ export const AdminPage = () => {
 
       if (response.ok) {
         setIsLinked(false);
+        // También cerrar sesión de Supabase
+        await supabase.auth.signOut();
+        
+        // Limpiar el código de acceso guardado y estado de autenticación
+        localStorage.removeItem('adminAccessCode');
+        setIsAuthenticated(false);
+        
         toast.success({
           text: "Cuenta desvinculada",
           description: "Se ha eliminado la conexión con Google Calendar.",
         });
-        
-        // También cerrar sesión de Supabase
-        await supabase.auth.signOut();
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Error al desvincular en el servidor");
@@ -482,7 +504,7 @@ export const AdminPage = () => {
               <p className="mt-2 text-gray-300">Ingresa el código de acceso para continuar</p>
             </div>
 
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
+            <form onSubmit={handleCodeSubmit} className="space-y-6">
               <div>
                 <Label htmlFor="accessCode" className="text-white font-semibold">
                   Código de Acceso
@@ -499,6 +521,19 @@ export const AdminPage = () => {
                 {codeError && (
                   <p className="mt-2 text-sm text-red-400">{codeError}</p>
                 )}
+              </div>
+
+              <div className="flex items-center">
+                <Input
+                  id="rememberCode"
+                  type="checkbox"
+                  checked={rememberCode}
+                  onChange={(e) => setRememberCode(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-offset-gray-800 focus:ring-blue-600"
+                />
+                <Label htmlFor="rememberCode" className="ml-2 block text-sm text-gray-300">
+                  Recordar código
+                </Label>
               </div>
               
               <Button
