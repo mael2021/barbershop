@@ -5,8 +5,22 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/supabase/client";
 import { GOOGLE_CALENDAR_SCOPES } from "@/lib/google";
 import { toast } from "@pheralb/toast";
-import { Trash2, Lock, Shield } from "lucide-react";
+import { Trash2, Lock, Shield, Calendar, Clock, User, RefreshCw } from "lucide-react";
 import { tokenManager } from "@/lib/tokenManager";
+
+interface Appointment {
+  id: string;
+  summary: string;
+  start: {
+    dateTime?: string;
+    date?: string;
+  };
+  end: {
+    dateTime?: string;
+    date?: string;
+  };
+  description?: string;
+}
 
 export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -14,6 +28,9 @@ export const AdminPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [codeError, setCodeError] = useState("");
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [deletingAppointment, setDeletingAppointment] = useState<string | null>(null);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -206,6 +223,13 @@ export const AdminPage = () => {
     };
   }, []);
 
+  // Cargar citas cuando la cuenta esté vinculada
+  useEffect(() => {
+    if (isAuthenticated && isLinked && !isLoading) {
+      loadTodayAppointments();
+    }
+  }, [isAuthenticated, isLinked, isLoading]);
+
   // Función para verificar el código de acceso
   const handleCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,6 +242,8 @@ export const AdminPage = () => {
         text: "Acceso autorizado",
         description: "Bienvenido al panel de administración.",
       });
+      // Cargar citas del día cuando se autentica
+      loadTodayAppointments();
     } else {
       setCodeError("Código incorrecto. Inténtalo nuevamente.");
       setAccessCode("");
@@ -225,6 +251,100 @@ export const AdminPage = () => {
         text: "Código incorrecto",
         description: "El código de acceso no es válido.",
       });
+    }
+  };
+
+  // Función para cargar las citas del día actual
+  const loadTodayAppointments = async () => {
+    if (!isLinked) return;
+    
+    setLoadingAppointments(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log("No hay sesión activa");
+        return;
+      }
+
+      // Obtener fecha de hoy
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const day = today.getDate();
+      
+      const dayStart = new Date(year, month, day, 0, 0, 0).toISOString();
+      const dayEnd = new Date(year, month, day, 23, 59, 59).toISOString();
+
+      const response = await tokenManager.callWithTokenRefresh<any>(async () => {
+        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "get_events",
+            timeMin: dayStart,
+            timeMax: dayEnd,
+            timeZone: "America/Mexico_City",
+          }),
+        });
+      });
+
+      if (response && response.events) {
+        setTodayAppointments(response.events);
+      } else {
+        setTodayAppointments([]);
+      }
+    } catch (error) {
+      console.error("Error al cargar citas:", error);
+      toast.error({
+        text: "Error al cargar citas",
+        description: "No se pudieron cargar las citas del día.",
+      });
+    } finally {
+      setLoadingAppointments(false);
+    }
+  };
+
+  // Función para eliminar una cita
+  const deleteAppointment = async (appointmentId: string) => {
+    setDeletingAppointment(appointmentId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("No hay sesión activa");
+      }
+
+      await tokenManager.callWithTokenRefresh<any>(async () => {
+        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "delete_event",
+            event_id: appointmentId,
+          }),
+        });
+      });
+
+      // Actualizar la lista de citas
+      setTodayAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
+      
+      toast.success({
+        text: "Cita eliminada",
+        description: "La cita ha sido eliminada exitosamente.",
+      });
+    } catch (error) {
+      console.error("Error al eliminar cita:", error);
+      toast.error({
+        text: "Error al eliminar",
+        description: "No se pudo eliminar la cita. Inténtalo nuevamente.",
+      });
+    } finally {
+      setDeletingAppointment(null);
     }
   };
 
@@ -373,29 +493,110 @@ export const AdminPage = () => {
               <p className="mt-2 text-gray-300">Vincula tu cuenta de Google Calendar</p>
             </div>
 
-            <div className="mt-8">
+            <div className="mt-8 space-y-6">
               {isLoading ? (
                 <div className="text-center text-white">
                   <p>Verificando estado de vinculación...</p>
                 </div>
               ) : isLinked ? (
-                <div className="space-y-4 text-center">
-                  <div className="text-green-400">
-                    <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
-                    <p className="mt-2 text-sm text-gray-300">
-                      La cuenta de Google Calendar está correctamente configurada.
-                    </p>
+                <>
+                  <div className="space-y-4 text-center">
+                    <div className="text-green-400">
+                      <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
+                      <p className="mt-2 text-sm text-gray-300">
+                        La cuenta de Google Calendar está correctamente configurada.
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={handleUnlink}
+                      disabled={isLoading}
+                      className="w-full bg-red-600 text-white hover:bg-red-700"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
+                    </Button>
                   </div>
-                  <Button
-                    variant="destructive"
-                    onClick={handleUnlink}
-                    disabled={isLoading}
-                    className="w-full bg-red-600 text-white hover:bg-red-700"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
-                  </Button>
-                </div>
+
+                  {/* Sección de citas del día */}
+                  <div className="border-t border-gray-600 pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        Citas de Hoy
+                      </h3>
+                      <Button
+                        onClick={loadTodayAppointments}
+                        disabled={loadingAppointments}
+                        size="sm"
+                        variant="outline"
+                        className="border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${loadingAppointments ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </div>
+
+                    {loadingAppointments ? (
+                      <div className="text-center text-gray-400 py-4">
+                        <p>Cargando citas...</p>
+                      </div>
+                    ) : todayAppointments.length === 0 ? (
+                      <div className="text-center text-gray-400 py-6">
+                        <Calendar className="mx-auto h-12 w-12 mb-2 opacity-50" />
+                        <p>No hay citas programadas para hoy</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {todayAppointments.map((appointment) => {
+                          const startTime = appointment.start.dateTime 
+                            ? new Date(appointment.start.dateTime).toLocaleTimeString('es-ES', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })
+                            : 'Todo el día';
+                          
+                          const clientInfo = appointment.description 
+                            ? appointment.description.split('\n').find(line => line.includes('Cliente:'))?.replace('Cliente: ', '') || 'Cliente no especificado'
+                            : 'Cliente no especificado';
+
+                          return (
+                            <div
+                              key={appointment.id}
+                              className="bg-gray-700 rounded-lg p-4 flex items-center justify-between"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Clock className="h-4 w-4 text-blue-400" />
+                                  <span className="text-white font-medium">{startTime}</span>
+                                </div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <User className="h-4 w-4 text-green-400" />
+                                  <span className="text-gray-300 text-sm">{clientInfo}</span>
+                                </div>
+                                <p className="text-gray-400 text-sm">
+                                  {appointment.summary?.replace('Cita: ', '') || 'Sin servicios especificados'}
+                                </p>
+                              </div>
+                              <Button
+                                onClick={() => deleteAppointment(appointment.id)}
+                                disabled={deletingAppointment === appointment.id}
+                                size="sm"
+                                variant="destructive"
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                {deletingAppointment === appointment.id ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <Button
                   onClick={handleGoogleLogin}
