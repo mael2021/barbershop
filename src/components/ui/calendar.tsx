@@ -51,13 +51,21 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
     // Verificar fecha mínima si se proporciona
     if (minDate) {
       const minDateObj = new Date(minDate + "T00:00:00");
-      if (date < minDateObj) return;
+      const selectedDateAtMidnight = new Date(date);
+      selectedDateAtMidnight.setHours(0, 0, 0, 0);
+      minDateObj.setHours(0, 0, 0, 0);
+      
+      if (selectedDateAtMidnight < minDateObj) return;
     }
     
-    // No permitir seleccionar fechas pasadas
+    // No permitir seleccionar fechas pasadas (pero SÍ permitir hoy)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (date < today) return;
+    const selectedDateAtMidnight = new Date(date);
+    selectedDateAtMidnight.setHours(0, 0, 0, 0);
+    
+    // Solo bloquear si es estrictamente menor que hoy (no igual)
+    if (selectedDateAtMidnight < today) return;
 
     setSelectedDate(date);
     if (onChange) {
@@ -92,13 +100,21 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
     // Verificar fecha mínima si se proporciona
     if (minDate) {
       const minDateObj = new Date(minDate + "T00:00:00");
-      if (date < minDateObj) return true;
+      const dateAtMidnight = new Date(date);
+      dateAtMidnight.setHours(0, 0, 0, 0);
+      minDateObj.setHours(0, 0, 0, 0);
+      
+      if (dateAtMidnight < minDateObj) return true;
     }
     
-    // Deshabilitar fechas pasadas
+    // Deshabilitar fechas pasadas (pero NO hoy)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return date < today;
+    const dateAtMidnight = new Date(date);
+    dateAtMidnight.setHours(0, 0, 0, 0);
+    
+    // Solo deshabilitar si es estrictamente menor que hoy (no igual)
+    return dateAtMidnight < today;
   };
 
   const isSameDay = (date1: Date | null, date2: Date | null) => {

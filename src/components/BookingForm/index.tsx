@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, User, Phone, X, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Calendar, Clock, User, Phone, X, ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
 import { supabase } from "@/supabase/client";
 import { services } from "@/consts/services";
 import { toast } from "@pheralb/toast";
@@ -109,6 +109,54 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "8:00 PM",
   ];
 
+  // Función para filtrar horarios que ya pasaron en el día actual
+  const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
+    const today = new Date();
+    const selectedDate = new Date(date + "T00:00:00");
+    
+    // Solo filtrar si la fecha seleccionada es hoy
+    if (selectedDate.toDateString() !== today.toDateString()) {
+      return availableSlots;
+    }
+    
+    const currentHour = today.getHours();
+    const currentMinute = today.getMinutes();
+    
+    // Filtrar horarios que ya pasaron
+    const filteredSlots = new Set<string>();
+    
+    availableSlots.forEach(timeSlot => {
+      const timeMatch = timeSlot.match(/(\d+):(\d+)\s*(AM|PM)/);
+      if (!timeMatch) return;
+      
+      const [, hours, minutes, period] = timeMatch;
+      let slotHour = parseInt(hours);
+      const slotMinute = parseInt(minutes);
+      
+      // Convertir a formato 24 horas
+      if (period === "AM" && slotHour === 12) {
+        slotHour = 0; // 12:00 AM = 00:00
+      } else if (period === "PM" && slotHour !== 12) {
+        slotHour += 12; // PM pero no 12:00 PM
+      }
+      
+      // Crear fecha del slot con 30 minutos de margen
+      // Si son las 6:19 PM, el slot de 6:00 PM estará disponible hasta las 6:30 PM
+      const slotEndTime = new Date();
+      slotEndTime.setHours(slotHour, slotMinute + 30, 0, 0); // Agregar 30 minutos de margen
+      
+      const currentTime = new Date();
+      currentTime.setHours(currentHour, currentMinute, 0, 0);
+      
+      // El slot está disponible si el tiempo actual es antes del slot + 30 minutos
+      if (slotEndTime > currentTime) {
+        filteredSlots.add(timeSlot);
+      }
+    });
+    
+    return filteredSlots;
+  };
+
   // Función para añadir un servicio
   const addService = (serviceName: string) => {
     const currentServices = formData.services || [];
@@ -130,6 +178,16 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       const service = services.find(s => s.name === serviceName);
       return total + (service?.price || 0);
     }, 0);
+  };
+
+  // Función para abrir WhatsApp
+  const openWhatsApp = () => {
+    const phoneNumber = "5212462021022"; // +52 246 202 1022 sin espacios ni símbolos
+    const message = encodeURIComponent(
+      `¡Hola! 👋\n\nEstoy interesado en agendar una cita después de las 8:00 PM.\n\n📅 Fecha deseada: ${formData.date || 'Por definir'}\n💇‍♂️ Servicios: ${formData.services?.join(', ') || 'Por definir'}\n\n¿Hay disponibilidad?`
+    );
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   // Memoize validateCurrentStep to avoid infinite loops
@@ -215,7 +273,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (!events.events || events.events.length === 0) {
         console.log("No hay eventos para esta fecha");
-        return new Set(timeSlots);
+        // Aún necesitamos filtrar horarios pasados si es hoy
+        return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
       console.log(`Eventos encontrados para ${date}:`, events.events);
@@ -281,11 +340,17 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         });
       });
       
-      console.log("Horarios disponibles:", Array.from(availableSlots));
-      return availableSlots;
+      console.log("Horarios disponibles antes de filtrar horarios pasados:", Array.from(availableSlots));
+      
+      // Filtrar horarios que ya pasaron si es el día actual
+      const finalAvailableSlots = filterPastTimeSlots(date, availableSlots);
+      
+      console.log("Horarios disponibles finales:", Array.from(finalAvailableSlots));
+      return finalAvailableSlots;
     } catch (error) {
       console.error("Error al consultar disponibilidad:", error);
-      return new Set(timeSlots);
+      // Incluso en caso de error, filtrar horarios pasados
+      return filterPastTimeSlots(date, new Set(timeSlots));
     }
   };
 
@@ -597,7 +662,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <CalendarComponent
                       value={formData.date}
                       onChange={(date) => setValue("date", date, { shouldValidate: true })}
-                      minDate={new Date().toISOString().split("T")[0]}
+                      minDate={getTodayDate()}
                     />
                   </div>
 
@@ -645,29 +710,46 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 {isLoadingSlots ? (
                   <div className="text-center text-white">Cargando horarios disponibles...</div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {timeSlots.map(time => {
-                      const isAvailable = availableSlots.has(time);
-                      return (
-                        <Button
-                          key={time}
-                          type="button"
-                          variant={formData.time === time ? "default" : "outline"}
-                          onClick={() => isAvailable && setValue("time", time)}
-                          disabled={!isAvailable}
-                          className={`${
-                            formData.time === time
-                              ? "bg-gradient-to-r from-spray-orange to-electric-blue text-white"
-                              : isAvailable
-                                ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
-                                : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
-                          } cursor-pointer transition-all duration-300`}
-                        >
-                          {time}
-                          {!isAvailable && " (Ocupado)"}
-                        </Button>
-                      );
-                    })}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {timeSlots.map(time => {
+                        const isAvailable = availableSlots.has(time);
+                        return (
+                          <Button
+                            key={time}
+                            type="button"
+                            variant={formData.time === time ? "default" : "outline"}
+                            onClick={() => isAvailable && setValue("time", time)}
+                            disabled={!isAvailable}
+                            className={`${
+                              formData.time === time
+                                ? "bg-gradient-to-r from-spray-orange to-electric-blue text-white"
+                                : isAvailable
+                                  ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
+                                  : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
+                            } cursor-pointer transition-all duration-300`}
+                          >
+                            {time}
+                            {!isAvailable && " (Ocupado)"}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Botón de WhatsApp para horarios después de 8:00 PM */}
+                    <div className="mt-6 pt-4 border-t border-gray-600/30">
+                      <div className="text-center mb-2">
+                        <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={openWhatsApp}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Consultar disponibilidad por WhatsApp
+                      </Button>
+                    </div>
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
