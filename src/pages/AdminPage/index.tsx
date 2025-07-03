@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { supabase } from "@/supabase/client";
 import { GOOGLE_CALENDAR_SCOPES } from "@/lib/google";
 import { toast } from "@pheralb/toast";
@@ -33,6 +34,7 @@ export const AdminPage = () => {
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [deletingAppointment, setDeletingAppointment] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   useEffect(() => {
     // Verificar si hay un código de acceso guardado
@@ -605,21 +607,32 @@ export const AdminPage = () => {
                       </Button>
                     </div>
 
-                    {/* Selector de fecha */}
-                    <div className="mb-4">
-                      <Label htmlFor="dateSelector" className="text-sm text-gray-300 mb-2 block">
+                    {/* Selector de fecha interactivo */}
+                    <div className="relative mb-4">
+                      <Label className="text-sm text-gray-300 mb-2 block">
                         Seleccionar fecha:
                       </Label>
-                      <Input
-                        id="dateSelector"
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => {
-                          setSelectedDate(e.target.value);
-                          loadTodayAppointments(e.target.value);
-                        }}
-                        className="bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                        className="w-full justify-start text-left font-normal bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        <span>{selectedDate}</span>
+                      </Button>
+                      {isCalendarOpen && (
+                        <div className="absolute z-10 top-full mt-2">
+                          <CalendarComponent
+                            value={selectedDate}
+                            onChange={(date) => {
+                              setSelectedDate(date);
+                              loadTodayAppointments(date);
+                              setIsCalendarOpen(false);
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {loadingAppointments ? (
