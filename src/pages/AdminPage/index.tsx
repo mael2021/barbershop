@@ -7,7 +7,6 @@ import { supabase } from "@/supabase/client";
 import { GOOGLE_CALENDAR_SCOPES } from "@/lib/google";
 import { toast } from "@pheralb/toast";
 import { Trash2, Lock, Shield, Calendar, Clock, User, RefreshCw } from "lucide-react";
-import { tokenManager } from "@/lib/tokenManager";
 
 interface Appointment {
   id: string;
@@ -184,58 +183,8 @@ export const AdminPage = () => {
       }
     });
 
-    // Configurar refresh automático del token cada 45 minutos
-    let refreshInterval: NodeJS.Timeout | null = null;
-    
-    const setupTokenRefresh = async () => {
-      // Verificar si hay una cuenta vinculada
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: "retrieve",
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.token) {
-            console.log("[AdminPage] Configurando refresh automático del token");
-            
-            // Refrescar inmediatamente al inicio
-            tokenManager.forceTokenRefresh();
-            
-            // Configurar refresh cada 45 minutos
-            refreshInterval = setInterval(async () => {
-              console.log("[AdminPage] Ejecutando refresh automático del token");
-              const refreshResult = await tokenManager.forceTokenRefresh();
-              if (!refreshResult.success) {
-                console.error("[AdminPage] Error en refresh automático:", refreshResult.error);
-                // Si falla el refresh, mostrar notificación
-                toast.warning({
-                  text: "Error al refrescar token",
-                  description: "Por favor, verifica tu conexión con Google Calendar",
-                });
-              }
-            }, 45 * 60 * 1000); // 45 minutos
-          }
-        }
-      }
-    };
-
-    setupTokenRefresh();
-
     return () => {
       subscription.unsubscribe();
-      // Limpiar el intervalo de refresh
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-      }
     };
   }, []);
 
@@ -245,6 +194,46 @@ export const AdminPage = () => {
       loadTodayAppointments();
     }
   }, [isAuthenticated, isLinked, isLoading]);
+
+  // Verificar el estado del token periódicamente
+  useEffect(() => {
+    if (isAuthenticated && isLinked) {
+      // Verificar inmediatamente al cargar
+      checkTokenStatus();
+
+      const interval = setInterval(checkTokenStatus, 15 * 60 * 1000); // Cada 15 minutos
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, isLinked]);
+
+  // Función para verificar el estado de la conexión con Google
+  const checkTokenStatus = async () => {
+    console.log("[DEBUG] Verificando estado del token de Google...");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return; // No hacer nada si no hay sesión
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action: "check_token_status" }),
+      });
+
+      const data = await response.json();
+      if (data.status === 'reauth_required') {
+        setIsLinked(false);
+        toast.error({
+          text: "Conexión Expirada",
+          description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
+        });
+      }
+    } catch (error) {
+      console.error("Error al verificar estado del token:", error);
+    }
+  };
 
   // Función para verificar el código de acceso
   const handleCodeSubmit = (e: React.FormEvent) => {
@@ -294,24 +283,37 @@ export const AdminPage = () => {
       const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
       const dayEnd = new Date(year, month - 1, day, 23, 59, 59).toISOString();
 
-      const response = await tokenManager.callWithTokenRefresh<any>(async () => {
-        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: "get_events",
-            timeMin: dayStart,
-            timeMax: dayEnd,
-            timeZone: "America/Mexico_City",
-          }),
-        });
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "get_events",
+          timeMin: dayStart,
+          timeMax: dayEnd,
+          timeZone: "America/Mexico_City",
+        }),
       });
 
-      if (response && response.events) {
-        setTodayAppointments(response.events);
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Handle token expiration gracefully
+        if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
+            setIsLinked(false);
+            toast.error({
+                text: "Conexión Expirada",
+                description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
+            });
+        }
+        throw new Error(errorData.error || "No se pudieron cargar las citas");
+      }
+
+      const data = await response.json();
+
+      if (data && data.events) {
+        setTodayAppointments(data.events);
       } else {
         setTodayAppointments([]);
       }
