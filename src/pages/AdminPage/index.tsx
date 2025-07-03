@@ -4,6 +4,7 @@ import { supabase } from "@/supabase/client";
 import { GOOGLE_CALENDAR_SCOPES } from "@/lib/google";
 import { toast } from "@pheralb/toast";
 import { Trash2 } from "lucide-react";
+import { tokenManager } from "@/lib/tokenManager";
 
 export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -145,8 +146,58 @@ export const AdminPage = () => {
       }
     });
 
+    // Configurar refresh automático del token cada 45 minutos
+    let refreshInterval: NodeJS.Timeout | null = null;
+    
+    const setupTokenRefresh = async () => {
+      // Verificar si hay una cuenta vinculada
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "retrieve",
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.token) {
+            console.log("[AdminPage] Configurando refresh automático del token");
+            
+            // Refrescar inmediatamente al inicio
+            tokenManager.forceTokenRefresh();
+            
+            // Configurar refresh cada 45 minutos
+            refreshInterval = setInterval(async () => {
+              console.log("[AdminPage] Ejecutando refresh automático del token");
+              const refreshResult = await tokenManager.forceTokenRefresh();
+              if (!refreshResult.success) {
+                console.error("[AdminPage] Error en refresh automático:", refreshResult.error);
+                // Si falla el refresh, mostrar notificación
+                toast.warning({
+                  text: "Error al refrescar token",
+                  description: "Por favor, verifica tu conexión con Google Calendar",
+                });
+              }
+            }, 45 * 60 * 1000); // 45 minutos
+          }
+        }
+      }
+    };
+
+    setupTokenRefresh();
+
     return () => {
       subscription.unsubscribe();
+      // Limpiar el intervalo de refresh
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
     };
   }, []);
 

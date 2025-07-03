@@ -13,6 +13,7 @@ import { services } from "@/consts/services";
 import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { tokenManager } from "@/lib/tokenManager";
 
 interface GoogleCalendarEvent {
   id: string;
@@ -190,39 +191,40 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
       const dayEnd = new Date(year, month - 1, day, 23, 59, 59).toISOString();
 
-      // Llamar a la Edge Function para obtener los eventos
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          action: "get_events",
-          timeMin: dayStart,
-          timeMax: dayEnd,
-          timeZone: "America/Mexico_City",
-        }),
+      // Usar tokenManager para hacer la llamada con refresh automático
+      const events = await tokenManager.callWithTokenRefresh<any>(async () => {
+        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "get_events",
+            timeMin: dayStart,
+            timeMax: dayEnd,
+            timeZone: "America/Mexico_City",
+          }),
+        });
       });
 
-      const { events, error } = await response.json();
-      if (error) {
-        console.error("Error al obtener eventos:", error);
+      if (!events || events.error) {
+        console.error("Error al obtener eventos:", events?.error);
         return new Set(timeSlots); // Si hay error, todos los horarios están disponibles
       }
 
-      if (!events || events.length === 0) {
+      if (!events.events || events.events.length === 0) {
         console.log("No hay eventos para esta fecha");
         return new Set(timeSlots);
       }
 
-      console.log(`Eventos encontrados para ${date}:`, events);
+      console.log(`Eventos encontrados para ${date}:`, events.events);
 
       // Crear un conjunto con todos los horarios disponibles
       const availableSlots = new Set(timeSlots);
 
       // Marcar como no disponibles los horarios que tienen eventos
-      events.forEach((event: GoogleCalendarEvent) => {
+      events.events.forEach((event: GoogleCalendarEvent) => {
         const eventStartStr = event.start.dateTime || event.start.date;
         const eventEndStr = event.end.dateTime || event.end.date;
         
@@ -409,25 +411,21 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       };
 
       try {
-        const calendarResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            action: "create_event",
-            event_data: event,
-          }),
+        // Usar tokenManager para crear el evento con refresh automático
+        const result = await tokenManager.callWithTokenRefresh<any>(async () => {
+          return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              action: "create_event",
+              event_data: event,
+            }),
+          });
         });
 
-        if (!calendarResponse.ok) {
-          const errorData = await calendarResponse.json();
-          console.error("Error creating Google Calendar event:", errorData);
-          throw new Error(errorData.error || "Error al crear evento en Google Calendar");
-        }
-
-        const result = await calendarResponse.json();
         console.log("Evento creado exitosamente:", result);
       } catch (calendarError) {
         console.error("Error creating Google Calendar event:", calendarError);
