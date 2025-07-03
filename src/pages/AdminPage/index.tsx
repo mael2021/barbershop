@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/supabase/client";
 import { GOOGLE_CALENDAR_SCOPES } from "@/lib/google";
 import { toast } from "@pheralb/toast";
-import { Trash2 } from "lucide-react";
+import { Trash2, Lock, Shield } from "lucide-react";
 import { tokenManager } from "@/lib/tokenManager";
 
 export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLinked, setIsLinked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [codeError, setCodeError] = useState("");
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -201,6 +206,28 @@ export const AdminPage = () => {
     };
   }, []);
 
+  // Función para verificar el código de acceso
+  const handleCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const correctCode = "cris2025F";
+    
+    if (accessCode === correctCode) {
+      setIsAuthenticated(true);
+      setCodeError("");
+      toast.success({
+        text: "Acceso autorizado",
+        description: "Bienvenido al panel de administración.",
+      });
+    } else {
+      setCodeError("Código incorrecto. Inténtalo nuevamente.");
+      setAccessCode("");
+      toast.error({
+        text: "Código incorrecto",
+        description: "El código de acceso no es válido.",
+      });
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
@@ -290,53 +317,106 @@ export const AdminPage = () => {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-4">
       <div className="w-full max-w-md space-y-8 rounded-lg bg-gray-800 p-8 shadow-lg">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-white">Panel de Administración</h2>
-          <p className="mt-2 text-gray-300">Vincula tu cuenta de Google Calendar</p>
-        </div>
-
-        <div className="mt-8">
-          {isLoading ? (
-            <div className="text-center text-white">
-              <p>Verificando estado de vinculación...</p>
-            </div>
-          ) : isLinked ? (
-            <div className="space-y-4 text-center">
-              <div className="text-green-400">
-                <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
-                <p className="mt-2 text-sm text-gray-300">
-                  La cuenta de Google Calendar está correctamente configurada.
-                </p>
+        {!isAuthenticated ? (
+          // Formulario de código de acceso
+          <>
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-red-600">
+                <Shield className="h-8 w-8 text-white" />
               </div>
-              <Button
-                variant="destructive"
-                onClick={handleUnlink}
-                disabled={isLoading}
-                className="w-full bg-red-600 text-white hover:bg-red-700"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
-              </Button>
+              <h2 className="text-3xl font-bold text-white">Acceso Restringido</h2>
+              <p className="mt-2 text-gray-300">Ingresa el código de acceso para continuar</p>
             </div>
-          ) : (
-            <Button
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-spray-orange to-electric-blue text-white hover:opacity-90"
-            >
-              {isLoading ? "Conectando..." : "Vincular cuenta de Google Calendar"}
-            </Button>
-          )}
-        </div>
 
-        <div className="mt-6 text-center">
-          <a
-            href="/"
-            className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
-          >
-            ← Volver al inicio
-          </a>
-        </div>
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="accessCode" className="text-white font-semibold">
+                  Código de Acceso
+                </Label>
+                <Input
+                  id="accessCode"
+                  type="password"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                  placeholder="Ingresa el código"
+                  className="mt-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500"
+                  required
+                />
+                {codeError && (
+                  <p className="mt-2 text-sm text-red-400">{codeError}</p>
+                )}
+              </div>
+              
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 flex items-center justify-center gap-2"
+              >
+                <Lock className="h-4 w-4" />
+                Verificar Código
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <a
+                href="/"
+                className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+              >
+                ← Volver al inicio
+              </a>
+            </div>
+          </>
+        ) : (
+          // Panel de administración (contenido original)
+          <>
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-white">Panel de Administración</h2>
+              <p className="mt-2 text-gray-300">Vincula tu cuenta de Google Calendar</p>
+            </div>
+
+            <div className="mt-8">
+              {isLoading ? (
+                <div className="text-center text-white">
+                  <p>Verificando estado de vinculación...</p>
+                </div>
+              ) : isLinked ? (
+                <div className="space-y-4 text-center">
+                  <div className="text-green-400">
+                    <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
+                    <p className="mt-2 text-sm text-gray-300">
+                      La cuenta de Google Calendar está correctamente configurada.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={handleUnlink}
+                    disabled={isLoading}
+                    className="w-full bg-red-600 text-white hover:bg-red-700"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-spray-orange to-electric-blue text-white hover:opacity-90"
+                >
+                  {isLoading ? "Conectando..." : "Vincular cuenta de Google Calendar"}
+                </Button>
+              )}
+            </div>
+
+            <div className="mt-6 text-center">
+              <a
+                href="/"
+                className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+              >
+                ← Volver al inicio
+              </a>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
