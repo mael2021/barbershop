@@ -31,6 +31,7 @@ export const AdminPage = () => {
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [deletingAppointment, setDeletingAppointment] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -254,8 +255,8 @@ export const AdminPage = () => {
     }
   };
 
-  // Función para cargar las citas del día actual
-  const loadTodayAppointments = async () => {
+  // Función para cargar las citas del día seleccionado
+  const loadTodayAppointments = async (dateToLoad?: string) => {
     if (!isLinked) return;
     
     setLoadingAppointments(true);
@@ -266,14 +267,12 @@ export const AdminPage = () => {
         return;
       }
 
-      // Obtener fecha de hoy
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = today.getMonth();
-      const day = today.getDate();
+      // Usar la fecha seleccionada o la fecha pasada como parámetro
+      const targetDate = dateToLoad || selectedDate;
+      const [year, month, day] = targetDate.split('-').map(Number);
       
-      const dayStart = new Date(year, month, day, 0, 0, 0).toISOString();
-      const dayEnd = new Date(year, month, day, 23, 59, 59).toISOString();
+      const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
+      const dayEnd = new Date(year, month - 1, day, 23, 59, 59).toISOString();
 
       const response = await tokenManager.callWithTokenRefresh<any>(async () => {
         return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
@@ -307,6 +306,11 @@ export const AdminPage = () => {
     }
   };
 
+  // Función para el botón de refresh
+  const handleRefreshAppointments = () => {
+    loadTodayAppointments();
+  };
+
   // Función para eliminar una cita
   const deleteAppointment = async (appointmentId: string) => {
     setDeletingAppointment(appointmentId);
@@ -316,19 +320,49 @@ export const AdminPage = () => {
         throw new Error("No hay sesión activa");
       }
 
-      await tokenManager.callWithTokenRefresh<any>(async () => {
-        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: "delete_event",
-            event_id: appointmentId,
-          }),
-        });
+      // Obtener el token de Google Calendar directamente sin TokenManager
+      const tokenResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "retrieve",
+        }),
       });
+
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        throw new Error(`Error al obtener token: ${errorData.error || tokenResponse.status}`);
+      }
+
+      const tokenData = await tokenResponse.json();
+      if (!tokenData.token) {
+        throw new Error("No se encontró token de Google");
+      }
+
+      // Eliminar evento directamente con la API de Google Calendar
+      const deleteResponse = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appointmentId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${tokenData.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!deleteResponse.ok) {
+        if (deleteResponse.status === 404) {
+          // El evento ya no existe, actualizar la lista
+          setTodayAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
+          toast.success({
+            text: "Cita eliminada",
+            description: "La cita ya no existía en el calendario.",
+          });
+          return;
+        }
+        throw new Error(`Error al eliminar evento: ${deleteResponse.status}`);
+      }
 
       // Actualizar la lista de citas
       setTodayAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
@@ -341,7 +375,7 @@ export const AdminPage = () => {
       console.error("Error al eliminar cita:", error);
       toast.error({
         text: "Error al eliminar",
-        description: "No se pudo eliminar la cita. Inténtalo nuevamente.",
+        description: error instanceof Error ? error.message : "No se pudo eliminar la cita. Inténtalo nuevamente.",
       });
     } finally {
       setDeletingAppointment(null);
@@ -523,10 +557,10 @@ export const AdminPage = () => {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                         <Calendar className="h-5 w-5" />
-                        Citas de Hoy
+                        Citas del Día
                       </h3>
                       <Button
-                        onClick={loadTodayAppointments}
+                        onClick={handleRefreshAppointments}
                         disabled={loadingAppointments}
                         size="sm"
                         variant="outline"
@@ -536,6 +570,23 @@ export const AdminPage = () => {
                       </Button>
                     </div>
 
+                    {/* Selector de fecha */}
+                    <div className="mb-4">
+                      <Label htmlFor="dateSelector" className="text-sm text-gray-300 mb-2 block">
+                        Seleccionar fecha:
+                      </Label>
+                      <Input
+                        id="dateSelector"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => {
+                          setSelectedDate(e.target.value);
+                          loadTodayAppointments(e.target.value);
+                        }}
+                        className="bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                      />
+                    </div>
+
                     {loadingAppointments ? (
                       <div className="text-center text-gray-400 py-4">
                         <p>Cargando citas...</p>
@@ -543,7 +594,7 @@ export const AdminPage = () => {
                     ) : todayAppointments.length === 0 ? (
                       <div className="text-center text-gray-400 py-6">
                         <Calendar className="mx-auto h-12 w-12 mb-2 opacity-50" />
-                        <p>No hay citas programadas para hoy</p>
+                        <p>No hay citas programadas para esta fecha</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
