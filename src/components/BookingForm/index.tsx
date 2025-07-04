@@ -705,29 +705,46 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 {isLoadingSlots ? (
                   <div className="text-center text-white">Cargando horarios disponibles...</div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {timeSlots.map(time => {
-                      const isAvailable = availableSlots.has(time);
-                      return (
-                        <Button
-                          key={time}
-                          type="button"
-                          variant={formData.time === time ? "default" : "outline"}
-                          onClick={() => isAvailable && setValue("time", time)}
-                          disabled={!isAvailable}
-                          className={`${
-                            formData.time === time
-                              ? "bg-gradient-to-r from-spray-orange to-electric-blue text-white"
-                              : isAvailable
-                                ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
-                                : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
-                          } cursor-pointer transition-all duration-300`}
-                        >
-                          {time}
-                          {!isAvailable && " (Ocupado)"}
-                        </Button>
-                      );
-                    })}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {timeSlots.map(time => {
+                        const isAvailable = availableSlots.has(time);
+                        return (
+                          <Button
+                            key={time}
+                            type="button"
+                            variant={formData.time === time ? "default" : "outline"}
+                            onClick={() => isAvailable && setValue("time", time)}
+                            disabled={!isAvailable}
+                            className={`${
+                              formData.time === time
+                                ? "bg-gradient-to-r from-spray-orange to-electric-blue text-white"
+                                : isAvailable
+                                  ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
+                                  : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
+                            } cursor-pointer transition-all duration-300`}
+                          >
+                            {time}
+                            {!isAvailable && " (Ocupado)"}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Botón de WhatsApp para horarios después de 8:00 PM */}
+                    <div className="mt-6 pt-4 border-t border-gray-600/30">
+                      <div className="text-center mb-2">
+                        <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={openWhatsApp}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Consultar disponibilidad por WhatsApp
+                      </Button>
+                    </div>
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
