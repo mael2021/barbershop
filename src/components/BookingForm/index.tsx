@@ -108,12 +108,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "8:00 PM",
   ];
 
-  // Función para filtrar horarios que ya pasaron en el día actual
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
     const today = new Date();
     const selectedDate = new Date(date + "T00:00:00");
     
-    // Solo filtrar si la fecha seleccionada es hoy
     if (selectedDate.toDateString() !== today.toDateString()) {
       return availableSlots;
     }
@@ -121,7 +119,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     const currentHour = today.getHours();
     const currentMinute = today.getMinutes();
     
-    // Filtrar horarios que ya pasaron
     const filteredSlots = new Set<string>();
     
     availableSlots.forEach(timeSlot => {
@@ -132,22 +129,18 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       let slotHour = parseInt(hours);
       const slotMinute = parseInt(minutes);
       
-      // Convertir a formato 24 horas
       if (period === "AM" && slotHour === 12) {
-        slotHour = 0; // 12:00 AM = 00:00
+        slotHour = 0;
       } else if (period === "PM" && slotHour !== 12) {
-        slotHour += 12; // PM pero no 12:00 PM
+        slotHour += 12;
       }
       
-      // Crear fecha del slot con 30 minutos de margen
-      // Si son las 6:19 PM, el slot de 6:00 PM estará disponible hasta las 6:30 PM
       const slotEndTime = new Date();
-      slotEndTime.setHours(slotHour, slotMinute + 30, 0, 0); // Agregar 30 minutos de margen
+      slotEndTime.setHours(slotHour, slotMinute + 30, 0, 0); 
       
       const currentTime = new Date();
       currentTime.setHours(currentHour, currentMinute, 0, 0);
       
-      // El slot está disponible si el tiempo actual es antes del slot + 30 minutos
       if (slotEndTime > currentTime) {
         filteredSlots.add(timeSlot);
       }
@@ -177,16 +170,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       const service = services.find(s => s.name === serviceName);
       return total + (service?.price || 0);
     }, 0);
-  };
-
-  // Función para abrir WhatsApp
-  const openWhatsApp = () => {
-    const phoneNumber = "5212462021022"; // +52 246 202 1022 sin espacios ni símbolos
-    const message = encodeURIComponent(
-      `¡Hola! 👋\n\nEstoy interesado en agendar una cita después de las 8:00 PM.\n\n📅 Fecha deseada: ${formData.date || 'Por definir'}\n💇‍♂️ Servicios: ${formData.services?.join(', ') || 'Por definir'}\n\n¿Hay disponibilidad?`
-    );
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
   };
 
   // Memoize validateCurrentStep to avoid infinite loops
@@ -243,24 +226,16 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad en Google Calendar
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
-      // Verificar si hay una sesión activa antes de hacer la llamada
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.log("No hay sesión activa, mostrando todos los horarios como disponibles");
-        return filterPastTimeSlots(date, new Set(timeSlots));
-      }
-
       // Calcular timeMin y timeMax para el día seleccionado
       const [year, month, day] = date.split("-").map(Number);
       const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
       const dayEnd = new Date(year, month - 1, day, 23, 59, 59).toISOString();
 
-      // Hacer la llamada directa a la función edge
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({
           action: "get_events",
@@ -270,27 +245,27 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         }),
       });
 
-      // Verificar si la respuesta es exitosa
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Error al obtener eventos:", errorData);
+        const errorMessage = typeof errorData.error === 'object' 
+            ? errorData.error.message || JSON.stringify(errorData.error)
+            : errorData.error;
+
+        console.error("Error al obtener eventos:", errorMessage);
         
-        // Manejar específicamente el error de re-autenticación requerida
-        if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
-          console.log("Se requiere re-autenticación del administrador");
+        if (errorMessage && errorMessage.includes('ADMIN_REAUTH_REQUIRED')) {
           toast.warning({
             text: "Problema de sincronización",
-            description: "Hay un problema con la conexión a Google Calendar. Los horarios mostrados pueden no estar actualizados.",
+            description: "Hay un problema con la conexión a Google Calendar. Los horarios pueden no estar actualizados.",
           });
         }
         
-        // En caso de error, mostrar todos los horarios disponibles filtrados
         return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
       const events = await response.json();
 
-      if (!events || !events.events) {
+      if (!events || !events.events || events.events.length === 0) {
         console.log("No hay eventos para esta fecha");
         return filterPastTimeSlots(date, new Set(timeSlots));
       }
@@ -307,14 +282,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         
         if (!eventStartStr || !eventEndStr) return;
         
-        console.log(`Procesando evento: ${event.summary}`);
-        console.log(`Inicio: ${eventStartStr}, Fin: ${eventEndStr}`);
-        
         const eventStart = new Date(eventStartStr);
         const eventEnd = new Date(eventEndStr);
         
         timeSlots.forEach(time => {
-          // Mejorar el parsing del horario
           const timeMatch = time.match(/(\d+):(\d+)\s*(AM|PM)/);
           if (!timeMatch) return;
           
@@ -322,52 +293,31 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
           let slotHour = parseInt(hours);
           const slotMinute = parseInt(minutes);
           
-          // Convertir a formato 24 horas correctamente
           if (period === "AM" && slotHour === 12) {
-            slotHour = 0; // 12:00 AM = 00:00
+            slotHour = 0;
           } else if (period === "PM" && slotHour !== 12) {
-            slotHour += 12; // PM pero no 12:00 PM
+            slotHour += 12;
           }
-          // 12:00 PM = 12:00 (no se modifica)
           
-          // Crear la fecha del slot en la zona horaria local
           const slotTime = new Date(year, month - 1, day, slotHour, slotMinute);
-          const slotEndTime = new Date(year, month - 1, day, slotHour + 1, slotMinute); // Slots de 1 hora
+          const slotEndTime = new Date(year, month - 1, day, slotHour + 1, slotMinute);
           
-          console.log(`Comparando slot ${time} (${slotTime.toISOString()}) con evento ${eventStart.toISOString()} - ${eventEnd.toISOString()}`);
-          
-          // Verificar si hay superposición entre el slot y el evento
-          // Un slot está ocupado si:
-          // 1. El inicio del slot está dentro del evento
-          // 2. El final del slot está dentro del evento  
-          // 3. El evento está completamente dentro del slot
-          // 4. El slot está completamente dentro del evento
           const isOverlapping = (
-            (slotTime >= eventStart && slotTime < eventEnd) || // Inicio del slot en el evento
-            (slotEndTime > eventStart && slotEndTime <= eventEnd) || // Final del slot en el evento
-            (slotTime <= eventStart && slotEndTime >= eventEnd) || // Evento dentro del slot
-            (slotTime >= eventStart && slotEndTime <= eventEnd) // Slot dentro del evento
+            (slotTime >= eventStart && slotTime < eventEnd) ||
+            (slotEndTime > eventStart && slotEndTime <= eventEnd) ||
+            (slotTime <= eventStart && slotEndTime >= eventEnd) ||
+            (slotTime >= eventStart && slotEndTime <= eventEnd)
           );
           
           if (isOverlapping) {
-            console.log(`❌ Slot ${time} no disponible - se superpone con evento`);
             availableSlots.delete(time);
-          } else {
-            console.log(`✅ Slot ${time} disponible`);
           }
         });
       });
       
-      console.log("Horarios disponibles antes de filtrar horarios pasados:", Array.from(availableSlots));
-      
-      // Filtrar horarios que ya pasaron si es el día actual
-      const finalAvailableSlots = filterPastTimeSlots(date, availableSlots);
-      
-      console.log("Horarios disponibles finales:", Array.from(finalAvailableSlots));
-      return finalAvailableSlots;
+      return filterPastTimeSlots(date, availableSlots);
     } catch (error) {
       console.error("Error al consultar disponibilidad:", error);
-      // Incluso en caso de error, filtrar horarios pasados
       return filterPastTimeSlots(date, new Set(timeSlots));
     }
   };
@@ -494,54 +444,46 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       };
 
       try {
-        // Verificar si hay una sesión activa antes de crear el evento
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log("No hay sesión activa, omitiendo creación de evento en Google Calendar");
-          toast.warning({
-            text: "Reserva creada sin sincronización",
-            description: "La reserva se guardó correctamente, pero no se sincronizó con Google Calendar. Contacta al administrador.",
-          });
-        } else {
-          // Hacer la llamada directa a la función edge
-          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              action: "create_event",
-              event_data: event,
-            }),
-          });
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "create_event",
+            event_data: event,
+          }),
+        });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error("Error al crear evento en Google Calendar:", errorData);
-            
-            if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
-              toast.warning({
-                text: "Reserva creada con advertencia",
-                description: "La reserva se guardó correctamente, pero hay un problema con la sincronización de Google Calendar. Contacta al administrador.",
-              });
-            } else {
-              toast.warning({
-                text: "Reserva creada, pero hubo un error al sincronizar con Google Calendar",
-                description: "La reserva se ha guardado correctamente, pero no se pudo crear en el calendario. Por favor, contacta al administrador.",
-              });
-            }
+        if (!response.ok) {
+          const errorData = await response.json();
+          const errorMessage = typeof errorData.error === 'object' 
+              ? errorData.error.message || JSON.stringify(errorData.error)
+              : errorData.error;
+
+          console.error("Error creating Google Calendar event:", errorMessage);
+          if (errorMessage && errorMessage.includes('ADMIN_REAUTH_REQUIRED')) {
+            toast.warning({
+              text: "Reserva creada con advertencia",
+              description: "La reserva se guardó, pero hay un problema con la sincronización de Google. Contacta al administrador.",
+            });
           } else {
-            const result = await response.json();
-            console.log("Evento creado exitosamente:", result);
+            toast.warning({
+              text: "Reserva creada, pero hubo un error al sincronizar",
+              description: "Tu reserva se guardó, pero no pudo aparecer en el calendario. Contacta al administrador.",
+            });
           }
+        } else {
+          const result = await response.json();
+          console.log("Evento creado exitosamente:", result);
         }
+
       } catch (calendarError) {
         console.error("Error creating Google Calendar event:", calendarError);
         toast.warning({
-          text: "Reserva creada, pero hubo un error al sincronizar con Google Calendar",
-          description:
-            "La reserva se ha guardado correctamente, pero no se pudo crear en el calendario. Por favor, contacta al administrador.",
+          text: "Reserva creada, pero hubo un error al sincronizar",
+          description: "Tu reserva se guardó, pero no pudo aparecer en el calendario. Contacta al administrador.",
         });
       }
 
@@ -561,6 +503,15 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const openWhatsApp = () => {
+    const phoneNumber = "5212462021022";
+    const message = encodeURIComponent(
+      `¡Hola! 👋\n\nEstoy interesado en agendar una cita después de las 8:00 PM.\n\n📅 Fecha deseada: ${formData.date || 'Por definir'}\n💇‍♂️ Servicios: ${formData.services?.join(', ') || 'Por definir'}\n\n¿Hay disponibilidad?`
+    );
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   if (!isOpen) return null;
@@ -706,7 +657,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <CalendarComponent
                       value={formData.date}
                       onChange={(date) => setValue("date", date, { shouldValidate: true })}
-                      minDate={getTodayDate()}
+                      minDate={new Date().toISOString().split("T")[0]}
                     />
                   </div>
 
@@ -754,46 +705,29 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 {isLoadingSlots ? (
                   <div className="text-center text-white">Cargando horarios disponibles...</div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {timeSlots.map(time => {
-                        const isAvailable = availableSlots.has(time);
-                        return (
-                          <Button
-                            key={time}
-                            type="button"
-                            variant={formData.time === time ? "default" : "outline"}
-                            onClick={() => isAvailable && setValue("time", time)}
-                            disabled={!isAvailable}
-                            className={`${
-                              formData.time === time
-                                ? "bg-gradient-to-r from-spray-orange to-electric-blue text-white"
-                                : isAvailable
-                                  ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
-                                  : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
-                            } cursor-pointer transition-all duration-300`}
-                          >
-                            {time}
-                            {!isAvailable && " (Ocupado)"}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* Botón de WhatsApp para horarios después de 8:00 PM */}
-                    <div className="mt-6 pt-4 border-t border-gray-600/30">
-                      <div className="text-center mb-2">
-                        <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={openWhatsApp}
-                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        Consultar disponibilidad por WhatsApp
-                      </Button>
-                    </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {timeSlots.map(time => {
+                      const isAvailable = availableSlots.has(time);
+                      return (
+                        <Button
+                          key={time}
+                          type="button"
+                          variant={formData.time === time ? "default" : "outline"}
+                          onClick={() => isAvailable && setValue("time", time)}
+                          disabled={!isAvailable}
+                          className={`${
+                            formData.time === time
+                              ? "bg-gradient-to-r from-spray-orange to-electric-blue text-white"
+                              : isAvailable
+                                ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
+                                : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
+                          } cursor-pointer transition-all duration-300`}
+                        >
+                          {time}
+                          {!isAvailable && " (Ocupado)"}
+                        </Button>
+                      );
+                    })}
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}

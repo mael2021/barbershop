@@ -306,10 +306,13 @@ export const AdminPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Error al obtener eventos:", errorData);
+        const errorMessage = typeof errorData.error === 'object' 
+          ? errorData.error.message || JSON.stringify(errorData.error)
+          : errorData.error;
+
+        console.error("Error al obtener eventos:", errorMessage);
         
-        // Handle token expiration gracefully
-        if (errorData.error === 'ADMIN_REAUTH_REQUIRED') {
+        if (errorMessage && (errorMessage.includes('ADMIN_REAUTH_REQUIRED') || errorMessage.includes('REAUTH_REQUIRED'))) {
             setIsLinked(false);
             toast.error({
                 text: "Conexión Expirada",
@@ -318,7 +321,7 @@ export const AdminPage = () => {
             return;
         }
         
-        throw new Error(errorData.error || "No se pudieron cargar las citas");
+        throw new Error(errorMessage || "No se pudieron cargar las citas");
       }
 
       const data = await response.json();
@@ -355,15 +358,15 @@ export const AdminPage = () => {
 
       // Obtener el token de Google Calendar directamente de la función edge
       const tokenResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          action: "retrieve",
-        }),
-      });
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "retrieve",
+          }),
+        });
 
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json();
@@ -412,7 +415,7 @@ export const AdminPage = () => {
           toast.error({
             text: "Conexión Expirada",
             description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
-          });
+                });
           return;
         }
         
@@ -434,8 +437,8 @@ export const AdminPage = () => {
       });
     } finally {
       setDeletingAppointment(null);
-    }
-  };
+      }
+    };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -594,35 +597,35 @@ export const AdminPage = () => {
         ) : (
           // Panel de administración (contenido original)
           <>
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-white">Panel de Administración</h2>
-              <p className="mt-2 text-gray-300">Vincula tu cuenta de Google Calendar</p>
-            </div>
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white">Panel de Administración</h2>
+          <p className="mt-2 text-gray-300">Vincula tu cuenta de Google Calendar</p>
+        </div>
 
             <div className="mt-8 space-y-6">
-              {isLoading ? (
-                <div className="text-center text-white">
-                  <p>Verificando estado de vinculación...</p>
-                </div>
-              ) : isLinked ? (
+          {isLoading ? (
+            <div className="text-center text-white">
+              <p>Verificando estado de vinculación...</p>
+            </div>
+          ) : isLinked ? (
                 <>
-                  <div className="space-y-4 text-center">
-                    <div className="text-green-400">
-                      <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
-                      <p className="mt-2 text-sm text-gray-300">
-                        La cuenta de Google Calendar está correctamente configurada.
-                      </p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      onClick={handleUnlink}
-                      disabled={isLoading}
-                      className="w-full bg-red-600 text-white hover:bg-red-700"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
-                    </Button>
-                  </div>
+            <div className="space-y-4 text-center">
+              <div className="text-green-400">
+                <p className="text-lg font-semibold">✅ Cuenta vinculada</p>
+                <p className="mt-2 text-sm text-gray-300">
+                  La cuenta de Google Calendar está correctamente configurada.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleUnlink}
+                disabled={isLoading}
+                className="w-full bg-red-600 text-white hover:bg-red-700"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isLoading ? "Desvinculando..." : "Desvincular cuenta"}
+              </Button>
+            </div>
 
                   {/* Sección de citas del día */}
                   <div className="border-t border-gray-600 pt-6">
@@ -731,25 +734,25 @@ export const AdminPage = () => {
                     )}
                   </div>
                 </>
-              ) : (
-                <Button
-                  onClick={handleGoogleLogin}
-                  disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-spray-orange to-electric-blue text-white hover:opacity-90"
-                >
-                  {isLoading ? "Conectando..." : "Vincular cuenta de Google Calendar"}
-                </Button>
-              )}
-            </div>
+          ) : (
+            <Button
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-spray-orange to-electric-blue text-white hover:opacity-90"
+            >
+              {isLoading ? "Conectando..." : "Vincular cuenta de Google Calendar"}
+            </Button>
+          )}
+        </div>
 
-            <div className="mt-6 text-center">
-              <a
-                href="/"
-                className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
-              >
-                ← Volver al inicio
-              </a>
-            </div>
+        <div className="mt-6 text-center">
+          <a
+            href="/"
+            className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+          >
+            ← Volver al inicio
+          </a>
+        </div>
           </>
         )}
       </div>
