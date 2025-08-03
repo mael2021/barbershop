@@ -236,6 +236,9 @@ export const AdminPage = () => {
           text: "Conexión Expirada",
           description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
         });
+      } else if (data.status === 'valid') {
+        console.log("[DEBUG] Token válido, renovación automática exitosa");
+        // El token se renovó automáticamente, no necesitamos hacer nada más
       }
     } catch (error) {
       console.error("Error al verificar estado del token:", error);
@@ -356,21 +359,22 @@ export const AdminPage = () => {
         throw new Error("No hay sesión activa");
       }
 
-      // Obtener el token de Google Calendar directamente de la función edge
-      const tokenResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: "retrieve",
-          }),
-        });
+      // Eliminar evento usando la función edge que maneja renovación automática
+      const deleteResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "delete_event",
+          event_id: appointmentId,
+        }),
+      });
 
-      if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json();
-        console.error("Error al obtener token:", errorData);
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json();
+        console.error("Error al eliminar evento:", errorData);
         
         if (errorData.error === 'REAUTH_REQUIRED' || errorData.error === 'ADMIN_REAUTH_REQUIRED') {
           setIsLinked(false);
@@ -381,53 +385,17 @@ export const AdminPage = () => {
           return;
         }
         
-        throw new Error(`Error al obtener token: ${errorData.error || tokenResponse.status}`);
+        throw new Error(`Error al eliminar evento: ${errorData.error || deleteResponse.status}`);
       }
 
-      const tokenData = await tokenResponse.json();
-      if (!tokenData.token) {
-        throw new Error("No se encontró token de Google");
-      }
-
-      // Eliminar evento directamente con la API de Google Calendar
-      const deleteResponse = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${appointmentId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${tokenData.token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!deleteResponse.ok) {
-        if (deleteResponse.status === 404) {
-          // El evento ya no existe, actualizar la lista
-          setTodayAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
-          toast.success({
-            text: "Cita eliminada",
-            description: "La cita ya no existía en el calendario.",
-          });
-          return;
-        }
-        
-        if (deleteResponse.status === 401) {
-          // Token expirado
-          setIsLinked(false);
-          toast.error({
-            text: "Conexión Expirada",
-            description: "Tu conexión con Google ha expirado. Por favor, vincula tu cuenta de nuevo.",
-                });
-          return;
-        }
-        
-        throw new Error(`Error al eliminar evento: ${deleteResponse.status}`);
-      }
-
+      const result = await deleteResponse.json();
+      
       // Actualizar la lista de citas
       setTodayAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
       
       toast.success({
         text: "Cita eliminada",
-        description: "La cita ha sido eliminada exitosamente.",
+        description: result.message || "La cita ha sido eliminada exitosamente.",
       });
     } catch (error) {
       console.error("Error al eliminar cita:", error);
