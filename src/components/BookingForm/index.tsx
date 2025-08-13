@@ -14,18 +14,7 @@ import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
-interface GoogleCalendarEvent {
-  id: string;
-  summary: string;
-  start: {
-    dateTime?: string;
-    date?: string;
-  };
-  end: {
-    dateTime?: string;
-    date?: string;
-  };
-}
+// Eliminado: interfaz de eventos de Google ya no usada en disponibilidad local
 
 interface BookingFormProps {
   isOpen: boolean;
@@ -223,101 +212,26 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     }
   }, [isOpen, reset, setCurrentStep]);
 
-  // Función para verificar disponibilidad en Google Calendar
+  // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
-      // Calcular timeMin y timeMax para el día seleccionado
-      const [year, month, day] = date.split("-").map(Number);
-      const dayStart = new Date(year, month - 1, day, 0, 0, 0).toISOString();
-      const dayEnd = new Date(year, month - 1, day, 23, 59, 59).toISOString();
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("time, status")
+        .eq("date", date)
+        .eq("status", "confirmed");
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          action: "get_events",
-          timeMin: dayStart,
-          timeMax: dayEnd,
-          timeZone: "America/Mexico_City",
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = typeof errorData.error === 'object' 
-            ? errorData.error.message || JSON.stringify(errorData.error)
-            : errorData.error;
-
-        console.error("Error al obtener eventos:", errorMessage);
-        
-        if (errorMessage && errorMessage.includes('ADMIN_REAUTH_REQUIRED')) {
-          toast.warning({
-            text: "Problema de sincronización",
-            description: "Hay un problema con la conexión a Google Calendar. Los horarios pueden no estar actualizados.",
-          });
-        }
-        
+      if (error) {
+        console.error("Error al consultar reservas:", error);
         return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
-      const events = await response.json();
+      const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
+      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
 
-      if (!events || !events.events || events.events.length === 0) {
-        console.log("No hay eventos para esta fecha");
-        return filterPastTimeSlots(date, new Set(timeSlots));
-      }
-
-      console.log(`Eventos encontrados para ${date}:`, events.events);
-
-      // Crear un conjunto con todos los horarios disponibles
-      const availableSlots = new Set(timeSlots);
-
-      // Marcar como no disponibles los horarios que tienen eventos
-      events.events.forEach((event: GoogleCalendarEvent) => {
-        const eventStartStr = event.start.dateTime || event.start.date;
-        const eventEndStr = event.end.dateTime || event.end.date;
-        
-        if (!eventStartStr || !eventEndStr) return;
-        
-        const eventStart = new Date(eventStartStr);
-        const eventEnd = new Date(eventEndStr);
-        
-        timeSlots.forEach(time => {
-          const timeMatch = time.match(/(\d+):(\d+)\s*(AM|PM)/);
-          if (!timeMatch) return;
-          
-          const [, hours, minutes, period] = timeMatch;
-          let slotHour = parseInt(hours);
-          const slotMinute = parseInt(minutes);
-          
-          if (period === "AM" && slotHour === 12) {
-            slotHour = 0;
-          } else if (period === "PM" && slotHour !== 12) {
-            slotHour += 12;
-          }
-          
-          const slotTime = new Date(year, month - 1, day, slotHour, slotMinute);
-          const slotEndTime = new Date(year, month - 1, day, slotHour + 1, slotMinute);
-          
-          const isOverlapping = (
-            (slotTime >= eventStart && slotTime < eventEnd) ||
-            (slotEndTime > eventStart && slotEndTime <= eventEnd) ||
-            (slotTime <= eventStart && slotEndTime >= eventEnd) ||
-            (slotTime >= eventStart && slotEndTime <= eventEnd)
-          );
-          
-          if (isOverlapping) {
-            availableSlots.delete(time);
-          }
-        });
-      });
-      
-      return filterPastTimeSlots(date, availableSlots);
-    } catch (error) {
-      console.error("Error al consultar disponibilidad:", error);
+      return filterPastTimeSlots(date, available);
+    } catch (err) {
+      console.error("Error al consultar disponibilidad en BD:", err);
       return filterPastTimeSlots(date, new Set(timeSlots));
     }
   };
