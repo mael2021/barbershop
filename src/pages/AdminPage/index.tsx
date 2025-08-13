@@ -22,6 +22,16 @@ interface Appointment {
   description?: string;
 }
 
+interface DbReservation {
+  id: string | number;
+  date: string;
+  time: string;
+  customer_name: string;
+  phone?: string;
+  services?: string[];
+  status?: string;
+}
+
 export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLinked, setIsLinked] = useState(false);
@@ -34,6 +44,11 @@ export const AdminPage = () => {
   const [deletingAppointment, setDeletingAppointment] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [dbReservations, setDbReservations] = useState<DbReservation[]>([]);
+  const [loadingDbReservations, setLoadingDbReservations] = useState(false);
+  const [deletingDbReservation, setDeletingDbReservation] = useState<string | number | null>(null);
+  const [isDbCalendarOpen, setIsDbCalendarOpen] = useState(false);
+  const [isSyncingDbToGoogle, setIsSyncingDbToGoogle] = useState(false);
 
   useEffect(() => {
     // Verificar si hay un código de acceso guardado
@@ -348,6 +363,279 @@ export const AdminPage = () => {
   // Función para el botón de refresh
   const handleRefreshAppointments = () => {
     loadTodayAppointments();
+  };
+
+  // Cargar reservas desde la BD (sin depender de Google)
+  const loadDbReservations = async (dateToLoad?: string) => {
+    setLoadingDbReservations(true);
+    try {
+      const targetDate = dateToLoad || selectedDate;
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, services, date, time, customer_name, phone, status')
+        .eq('date', targetDate);
+
+      if (error) {
+        throw error;
+      }
+
+      setDbReservations((data as DbReservation[]) || []);
+    } catch (error) {
+      console.error('Error al cargar reservas de BD:', error);
+      toast.error({
+        text: 'Error al cargar reservas',
+        description: 'No se pudieron cargar las reservas de la base de datos.',
+      });
+    } finally {
+      setLoadingDbReservations(false);
+    }
+  };
+
+  // Eliminar reserva en BD
+  const deleteDbReservation = async (reservationId: string | number) => {
+    setDeletingDbReservation(reservationId);
+    try {
+      // Normalizar ID numérico si viene como string
+      const idAsNumber = typeof reservationId === 'string' && /^\d+$/.test(reservationId) ? Number(reservationId) : reservationId;
+      const idAsString = String(reservationId);
+
+      // 1) Intento por ID (numérico si aplica)
+      const { data: deletedByIdRaw, error: deleteByIdError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', idAsNumber)
+        .select('id');
+
+      if (deleteByIdError) {
+        throw deleteByIdError;
+      }
+
+      const deletedById = deletedByIdRaw as unknown as Array<{ id: string | number }> | null;
+      if (Array.isArray(deletedById) && deletedById.length > 0) {
+        setDbReservations(prev => prev.filter(r => String(r.id) !== String(reservationId)));
+        toast.success({ text: 'Reserva eliminada', description: 'La reserva se ha eliminado de la base de datos.' });
+        return;
+      }
+
+      // 1b) Segundo intento por ID en formato string (para columnas bigint)
+      const { data: deletedByIdStrRaw, error: deleteByIdStrError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', idAsString)
+        .select('id');
+
+      if (deleteByIdStrError) {
+        throw deleteByIdStrError;
+      }
+
+      const deletedByIdStr = deletedByIdStrRaw as unknown as Array<{ id: string | number }> | null;
+      if (Array.isArray(deletedByIdStr) && deletedByIdStr.length > 0) {
+        setDbReservations(prev => prev.filter(r => String(r.id) !== String(reservationId)));
+        toast.success({ text: 'Reserva eliminada', description: 'La reserva se ha eliminado de la base de datos.' });
+        return;
+      }
+
+      // 2) Fallback: intentar por combinación única (fecha, hora, nombre, teléfono)
+      const target = dbReservations.find(r => String(r.id) === String(reservationId));
+      if (target) {
+        const { data: deletedByCompositeRaw, error: deleteByCompositeError } = await supabase
+          .from('reservations')
+          .delete()
+          .match({ date: target.date, time: target.time, customer_name: target.customer_name, phone: target.phone });
+
+        if (deleteByCompositeError) {
+          throw deleteByCompositeError;
+        }
+
+        const deletedByComposite = deletedByCompositeRaw as unknown as Array<{ id: string | number }> | null;
+        if (Array.isArray(deletedByComposite) && deletedByComposite.length > 0) {
+          setDbReservations(prev => prev.filter(r => String(r.id) !== String(reservationId)));
+          toast.success({ text: 'Reserva eliminada', description: 'La reserva se ha eliminado de la base de datos.' });
+          return;
+        }
+      }
+
+      // 3) Verificar existencia para avisar si es un tema de permisos RLS o realmente no existe
+      const { data: existing, error: checkError } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('id', idAsNumber)
+        .maybeSingle();
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existing) {
+        toast.error({
+          text: 'No se pudo eliminar',
+          description: 'La reserva existe pero no se pudo eliminar. Verifica las políticas RLS de DELETE en Supabase.',
+        });
+      } else {
+        // Intento de verificación por string
+        const { data: existingStr } = await supabase
+          .from('reservations')
+          .select('id')
+          .eq('id', idAsString)
+          .maybeSingle();
+
+        if (existingStr) {
+          toast.error({
+            text: 'No se pudo eliminar',
+            description: 'La reserva existe (por id string) pero no se pudo eliminar. Verifica las políticas RLS de DELETE en Supabase.',
+          });
+          return;
+        }
+        toast.warning({
+          text: 'No se encontró la reserva',
+          description: 'No se eliminó ningún registro. Verifica el ID de la reserva.',
+        });
+      }
+    } catch (error) {
+      console.error('Error al eliminar reserva BD:', error);
+      toast.error({
+        text: 'Error al eliminar',
+        description: 'No se pudo eliminar la reserva de la base de datos.',
+      });
+    } finally {
+      setDeletingDbReservation(null);
+    }
+  };
+
+  // Cargar reservas BD cuando hay autenticación o cambia la fecha
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDbReservations();
+    }
+  }, [isAuthenticated, selectedDate]);
+
+  // Helpers para sincronización BD -> Google
+  const parseTime12hTo24 = (timeStr: string) => {
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return { hour: 0, minute: 0 };
+    const [, hh, mm, period] = match;
+    let hour = parseInt(hh, 10);
+    const minute = parseInt(mm, 10);
+    const p = period.toUpperCase();
+    if (p === 'AM' && hour === 12) hour = 0;
+    if (p === 'PM' && hour !== 12) hour += 12;
+    return { hour, minute };
+  };
+
+  const buildEventFromReservation = (r: DbReservation) => {
+    const [year, month, day] = r.date.split('-').map(Number);
+    const { hour, minute } = parseTime12hTo24(r.time);
+    const startDateTime = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    const endHour = (hour + 1) % 24;
+    const endDateTime = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    const servicesText = Array.isArray(r.services) ? r.services.join(', ') : '';
+    return {
+      summary: `Cita: ${servicesText}`,
+      description: `Cliente: ${r.customer_name}\nTeléfono: ${r.phone || ''}`,
+      start: { dateTime: startDateTime, timeZone: 'America/Mexico_City' },
+      end: { dateTime: endDateTime, timeZone: 'America/Mexico_City' },
+    };
+  };
+
+  const getDayBounds = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return {
+      timeMin: new Date(y, m - 1, d, 0, 0, 0).toISOString(),
+      timeMax: new Date(y, m - 1, d, 23, 59, 59).toISOString(),
+    };
+  };
+
+  const fetchGoogleEventsForDate = async (dateStr: string) => {
+    const { timeMin, timeMax } = getDayBounds(dateStr);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ action: 'get_events', timeMin, timeMax, timeZone: 'America/Mexico_City' }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(typeof err.error === 'string' ? err.error : (err.message || 'Error al obtener eventos'));
+      }
+      const payload = await response.json();
+      return Array.isArray(payload.events) ? payload.events : [];
+    } catch (e) {
+      throw e;
+    }
+  };
+
+  const eventsMatchReservation = (event: any, r: DbReservation) => {
+    if (!event?.start?.dateTime) return false;
+    const eventStart = new Date(event.start.dateTime);
+    const [y, m, d] = r.date.split('-').map(Number);
+    const { hour, minute } = parseTime12hTo24(r.time);
+    const rStart = new Date(y, m - 1, d, hour, minute, 0);
+    if (Math.abs(eventStart.getTime() - rStart.getTime()) > 60 * 1000) return false;
+    // Validar por descripción y/o resumen
+    const desc = event.description || '';
+    const phone = (r.phone || '').toString();
+    const hasClient = desc.includes('Cliente:') && (phone === '' || desc.includes(phone));
+    const summaryOk = typeof event.summary === 'string' && event.summary.startsWith('Cita:');
+    return hasClient || summaryOk;
+  };
+
+  const syncDbReservationsToGoogle = async () => {
+    if (dbReservations.length === 0) {
+      toast.warning({ text: 'Sin reservas', description: 'No hay reservas para sincronizar en esta fecha.' });
+      return;
+    }
+    setIsSyncingDbToGoogle(true);
+    try {
+      // Obtener eventos actuales de Google para evitar duplicados
+      let googleEvents: any[] = [];
+      try {
+        googleEvents = await fetchGoogleEventsForDate(selectedDate);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('ADMIN_REAUTH_REQUIRED') || msg.includes('No hay administrador')) {
+          toast.error({ text: 'Conecta Google', description: 'Vincula una cuenta de Google Calendar en el panel.' });
+          setIsSyncingDbToGoogle(false);
+          return;
+        }
+        throw err;
+      }
+
+      let created = 0;
+      for (const r of dbReservations) {
+        const alreadyExists = googleEvents.some(ev => eventsMatchReservation(ev, r));
+        if (alreadyExists) continue;
+        const event = buildEventFromReservation(r);
+        const { data: { session } } = await supabase.auth.getSession();
+        const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/store-google-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ action: 'create_event', event_data: event }),
+        });
+        if (resp.ok) {
+          created += 1;
+        } else {
+          const err = await resp.json().catch(() => ({}));
+          console.error('Error al crear evento:', err);
+        }
+      }
+
+      toast.success({
+        text: 'Sincronización completada',
+        description: created > 0 ? `Se crearon ${created} evento(s) en Google Calendar.` : 'No había eventos por crear.',
+      });
+    } catch (error) {
+      console.error('Error al sincronizar BD -> Google:', error);
+      toast.error({ text: 'Error al sincronizar', description: 'Revisa la conexión con Google o intenta más tarde.' });
+    } finally {
+      setIsSyncingDbToGoogle(false);
+    }
   };
 
   // Función para eliminar una cita
@@ -710,6 +998,117 @@ export const AdminPage = () => {
             >
               {isLoading ? "Conectando..." : "Vincular cuenta de Google Calendar"}
             </Button>
+          )}
+        </div>
+
+        {/* Sección de citas desde Base de Datos */}
+        <div className="border-t border-gray-600 pt-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Citas en Base de Datos
+            </h3>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => loadDbReservations()}
+                disabled={loadingDbReservations}
+                size="sm"
+                variant="outline"
+                className="border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingDbReservations ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                onClick={syncDbReservationsToGoogle}
+                disabled={isSyncingDbToGoogle || !isLinked}
+                size="sm"
+                variant="outline"
+                className="border-gray-600 text-gray-300 hover:border-green-500 hover:text-green-400"
+                title={isLinked ? 'Sincronizar a Google Calendar' : 'Vincula Google Calendar para sincronizar'}
+              >
+                {isSyncingDbToGoogle ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <span>Sincronizar a Google</span>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Selector de fecha para BD */}
+          <div className="relative mb-4">
+            <Label className="text-sm text-gray-300 mb-2 block">
+              Seleccionar fecha:
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDbCalendarOpen(!isDbCalendarOpen)}
+              className="w-full justify-start text-left font-normal bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              <span>{selectedDate}</span>
+            </Button>
+            {isDbCalendarOpen && (
+              <div className="absolute z-10 top-full mt-2">
+                <CalendarComponent
+                  value={selectedDate}
+                  onChange={(date) => {
+                    setSelectedDate(date);
+                    loadDbReservations(date);
+                    setIsDbCalendarOpen(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {loadingDbReservations ? (
+            <div className="text-center text-gray-400 py-4">
+              <p>Cargando citas...</p>
+            </div>
+          ) : dbReservations.length === 0 ? (
+            <div className="text-center text-gray-400 py-6">
+              <Calendar className="mx-auto h-12 w-12 mb-2 opacity-50" />
+              <p>No hay reservas en la base de datos para esta fecha</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {dbReservations.map((reservation) => {
+                const servicesText = Array.isArray(reservation.services) ? reservation.services.join(', ') : '';
+                return (
+                  <div
+                    key={reservation.id}
+                    className="bg-gray-700 rounded-lg p-4 flex items-center justify-between"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-blue-400" />
+                        <span className="text-white font-medium">{reservation.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="h-4 w-4 text-green-400" />
+                        <span className="text-gray-300 text-sm">{reservation.customer_name}</span>
+                      </div>
+                      <p className="text-gray-400 text-sm">{servicesText || 'Sin servicios especificados'}</p>
+                    </div>
+                    <Button
+                      onClick={() => deleteDbReservation(reservation.id)}
+                      disabled={deletingDbReservation === reservation.id}
+                      size="sm"
+                      variant="destructive"
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {deletingDbReservation === reservation.id ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
