@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +49,7 @@ export const AdminPage = () => {
   const [deletingDbReservation, setDeletingDbReservation] = useState<string | number | null>(null);
   const [isDbCalendarOpen, setIsDbCalendarOpen] = useState(false);
   const [isSyncingDbToGoogle, setIsSyncingDbToGoogle] = useState(false);
+  const hasAutoSyncedRef = useRef(false);
 
   useEffect(() => {
     // Verificar si hay un código de acceso guardado
@@ -209,6 +210,22 @@ export const AdminPage = () => {
       loadTodayAppointments();
     }
   }, [isAuthenticated, isLinked, isLoading]);
+
+  // Auto-sincronizar BD -> Google una vez al vincular
+  useEffect(() => {
+    const runAutoSync = async () => {
+      if (!isAuthenticated || !isLinked || isLoading) return;
+      if (hasAutoSyncedRef.current) return;
+      try {
+        await loadDbReservations(selectedDate);
+        await syncDbReservationsToGoogle();
+        hasAutoSyncedRef.current = true;
+      } catch (e) {
+        // Silencioso: ya se notifican errores en dentro de las funciones
+      }
+    };
+    runAutoSync();
+  }, [isAuthenticated, isLinked, isLoading, selectedDate]);
 
   // Verificar el estado del token periódicamente
   useEffect(() => {
@@ -526,8 +543,9 @@ export const AdminPage = () => {
     const [year, month, day] = r.date.split('-').map(Number);
     const { hour, minute } = parseTime12hTo24(r.time);
     const startDateTime = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
-    const endHour = (hour + 1) % 24;
-    const endDateTime = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+    const end = new Date(year, month - 1, day, hour, minute);
+    end.setMinutes(end.getMinutes() + 60);
+    const endDateTime = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}T${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}:00`;
     const servicesText = Array.isArray(r.services) ? r.services.join(', ') : '';
     return {
       summary: `Cita: ${servicesText}`,
@@ -569,18 +587,21 @@ export const AdminPage = () => {
   };
 
   const eventsMatchReservation = (event: any, r: DbReservation) => {
-    if (!event?.start?.dateTime) return false;
+    if (!event?.start?.dateTime || !event?.end?.dateTime) return false;
     const eventStart = new Date(event.start.dateTime);
+    const eventEnd = new Date(event.end.dateTime);
     const [y, m, d] = r.date.split('-').map(Number);
     const { hour, minute } = parseTime12hTo24(r.time);
     const rStart = new Date(y, m - 1, d, hour, minute, 0);
-    if (Math.abs(eventStart.getTime() - rStart.getTime()) > 60 * 1000) return false;
-    // Validar por descripción y/o resumen
+    const rEnd = new Date(rStart.getTime());
+    rEnd.setMinutes(rEnd.getMinutes() + 60);
+    // Considerar matching si el evento traslapa y summary/desc concuerdan
+    const overlaps = !(eventEnd <= rStart || eventStart >= rEnd);
     const desc = event.description || '';
     const phone = (r.phone || '').toString();
     const hasClient = desc.includes('Cliente:') && (phone === '' || desc.includes(phone));
     const summaryOk = typeof event.summary === 'string' && event.summary.startsWith('Cita:');
-    return hasClient || summaryOk;
+    return overlaps && (hasClient || summaryOk);
   };
 
   const syncDbReservationsToGoogle = async () => {
@@ -605,7 +626,7 @@ export const AdminPage = () => {
       }
 
       let created = 0;
-      for (const r of dbReservations) {
+      for (const r of dbReservations.filter(x => (x.status || 'confirmed') === 'confirmed')) {
         const alreadyExists = googleEvents.some(ev => eventsMatchReservation(ev, r));
         if (alreadyExists) continue;
         const event = buildEventFromReservation(r);
