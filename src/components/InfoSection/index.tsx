@@ -26,7 +26,7 @@ export const InfoSection = () => {
             🕒 Horarios
           </h3>
           <p className="text-center text-sm text-gray-300">⏰ Lunes a Sábado: 10:00 AM - 8:00 PM</p>
-          <p className="text-center text-sm text-gray-300">🔒 Domingo: Cerrado</p>
+          <p className="text-center text-sm text-gray-300">🔒 Domingo: 11:00 AM - 5:00 PM</p>
         </article>
 
         <article className="flex flex-col items-center gap-y-2">

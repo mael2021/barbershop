@@ -25,11 +25,7 @@ interface BookingFormProps {
 
 const bookingFormSchema = z.object({
   services: z.array(z.string()).min(1, "Debes seleccionar al menos un servicio"),
-  date: z.string().min(1, "La fecha es requerida").refine((date) => {
-    const selectedDate = new Date(date + "T00:00:00");
-    const dayOfWeek = selectedDate.getDay();
-    return dayOfWeek !== 0; // 0 es domingo
-  }, "La barbería no abre los domingos"),
+  date: z.string().min(1, "La fecha es requerida"),
   time: z.string().min(1, "La hora es requerida"),
   name: z
     .string()
@@ -95,6 +91,16 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "6:00 PM",
     "7:00 PM",
     "8:00 PM",
+  ];
+
+  const sundayTimeSlots = [
+    "11:00 AM",
+    "12:00 PM",
+    "1:00 PM",
+    "2:00 PM",
+    "3:00 PM",
+    "4:00 PM",
+    "5:00 PM",
   ];
 
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
@@ -223,16 +229,30 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        return filterPastTimeSlots(date, new Set(timeSlots));
+        // Determinar si es domingo para usar horarios correctos
+        const selectedDate = new Date(date + "T00:00:00");
+        const isSunday = selectedDate.getDay() === 0;
+        const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+        return filterPastTimeSlots(date, new Set(slotsToUse));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
+      
+      // Determinar si es domingo para usar horarios correctos
+      const selectedDate = new Date(date + "T00:00:00");
+      const isSunday = selectedDate.getDay() === 0;
+      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+      
+      const available = new Set<string>(slotsToUse.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      return filterPastTimeSlots(date, new Set(timeSlots));
+      // Determinar si es domingo para usar horarios correctos
+      const selectedDate = new Date(date + "T00:00:00");
+      const isSunday = selectedDate.getDay() === 0;
+      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+      return filterPastTimeSlots(date, new Set(slotsToUse));
     }
   };
 
@@ -585,18 +605,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         errors.date ? "border-red-500 focus-visible:ring-red-500" : ""
                       }`}
                       min={getTodayDate()}
-                      onInput={(e) => {
-                        const input = e.target as HTMLInputElement;
-                        const date = new Date(input.value + "T00:00:00");
-                        if (date.getDay() === 0) {
-                          input.value = "";
-                          setValue("date", "", { shouldValidate: true });
-                          toast.warning({
-                            text: "Domingos cerrado",
-                            description: "La barbería no abre los domingos. Por favor selecciona otro día.",
-                          });
-                        }
-                      }}
+
                     />
                   </div>
                   
@@ -613,7 +622,16 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <Clock className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="mb-2 text-2xl font-bold text-white">Selecciona tu hora</h3>
-                  <p className="text-white">Horarios disponibles (citas de 1 hora)</p>
+                  <p className="text-white">
+                    {(() => {
+                      if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
+                      const selectedDate = new Date(formData.date + "T00:00:00");
+                      const isSunday = selectedDate.getDay() === 0;
+                      return isSunday 
+                        ? "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)"
+                        : "Horarios disponibles (citas de 1 hora)";
+                    })()} 
+                  </p>
                 </div>
 
                 {isLoadingSlots ? (
@@ -621,7 +639,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {timeSlots.map(time => {
+                      {(() => {
+                        // Determinar qué horarios mostrar según el día seleccionado
+                        if (!formData.date) return timeSlots;
+                        const selectedDate = new Date(formData.date + "T00:00:00");
+                        const isSunday = selectedDate.getDay() === 0;
+                        return isSunday ? sundayTimeSlots : timeSlots;
+                      })().map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
                           <Button
@@ -645,20 +669,31 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       })}
                     </div>
                     
-                    {/* Botón de WhatsApp para horarios después de 8:00 PM */}
-                    <div className="mt-6 pt-4 border-t border-gray-600/30">
-                      <div className="text-center mb-2">
-                        <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={openWhatsApp}
-                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        Consultar disponibilidad por WhatsApp
-                      </Button>
-                    </div>
+                    {/* Botón de WhatsApp para horarios después de 8:00 PM (solo en días normales) */}
+                    {(() => {
+                      if (!formData.date) return null;
+                      const selectedDate = new Date(formData.date + "T00:00:00");
+                      const isSunday = selectedDate.getDay() === 0;
+                      
+                      // Solo mostrar el botón de WhatsApp en días normales (no domingos)
+                      if (isSunday) return null;
+                      
+                      return (
+                        <div className="mt-6 pt-4 border-t border-gray-600/30">
+                          <div className="text-center mb-2">
+                            <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={openWhatsApp}
+                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            Consultar disponibilidad por WhatsApp
+                          </Button>
+                        </div>
+                      );
+                    })()} 
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
