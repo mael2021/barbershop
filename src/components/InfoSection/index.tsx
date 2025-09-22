@@ -25,7 +25,8 @@ export const InfoSection = () => {
           <h3 className="font-graffiti graffiti-shadow mb-2 text-3xl font-bold text-pretty text-spray-orange uppercase">
             🕒 Horarios
           </h3>
-          <p className="text-center text-sm text-gray-300">⏰ Lunes a Sábado: 10:00 AM - 8:00 PM</p>
+          <p className="text-center text-sm text-gray-300">⏰ Lunes, Miércoles a Sábado: 10:00 AM - 8:00 PM</p>
+          <p className="text-center text-sm text-gray-300">⏰ Martes: 9:00 AM - 12:00 PM</p>
           <p className="text-center text-sm text-gray-300">🔒 Domingo: 11:00 AM - 5:00 PM</p>
         </article>
 

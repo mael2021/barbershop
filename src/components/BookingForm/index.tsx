@@ -103,6 +103,14 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "5:00 PM",
   ];
 
+  // Solo los martes (getDay() === 2) de 9:00 AM a 12:00 PM
+  const tuesdayTimeSlots = [
+    "9:00 AM",
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+  ];
+
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
     const today = new Date();
     const selectedDate = new Date(date + "T00:00:00");
@@ -229,29 +237,32 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Determinar si es domingo para usar horarios correctos
+        // Determinar si es domingo o martes para usar horarios correctos
         const selectedDate = new Date(date + "T00:00:00");
         const isSunday = selectedDate.getDay() === 0;
-        const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+        const isTuesday = selectedDate.getDay() === 2;
+        const slotsToUse = isSunday ? sundayTimeSlots : isTuesday ? tuesdayTimeSlots : timeSlots;
         return filterPastTimeSlots(date, new Set(slotsToUse));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
       
-      // Determinar si es domingo para usar horarios correctos
+      // Determinar si es domingo o martes para usar horarios correctos
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+      const isTuesday = selectedDate.getDay() === 2;
+      const slotsToUse = isSunday ? sundayTimeSlots : isTuesday ? tuesdayTimeSlots : timeSlots;
       
       const available = new Set<string>(slotsToUse.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Determinar si es domingo para usar horarios correctos
+      // Determinar si es domingo o martes para usar horarios correctos
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+      const isTuesday = selectedDate.getDay() === 2;
+      const slotsToUse = isSunday ? sundayTimeSlots : isTuesday ? tuesdayTimeSlots : timeSlots;
       return filterPastTimeSlots(date, new Set(slotsToUse));
     }
   };
@@ -627,9 +638,14 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
-                      return isSunday 
-                        ? "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)"
-                        : "Horarios disponibles (citas de 1 hora)";
+                      const isTuesday = selectedDate.getDay() === 2;
+                      if (isSunday) {
+                        return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
+                      }
+                      if (isTuesday) {
+                        return "Horarios de martes: 9:00 AM - 12:00 PM (citas de 1 hora)";
+                      }
+                      return "Horarios disponibles (citas de 1 hora)";
                     })()} 
                   </p>
                 </div>
@@ -644,7 +660,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         if (!formData.date) return timeSlots;
                         const selectedDate = new Date(formData.date + "T00:00:00");
                         const isSunday = selectedDate.getDay() === 0;
-                        return isSunday ? sundayTimeSlots : timeSlots;
+                        const isTuesday = selectedDate.getDay() === 2;
+                        return isSunday ? sundayTimeSlots : isTuesday ? tuesdayTimeSlots : timeSlots;
                       })().map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
