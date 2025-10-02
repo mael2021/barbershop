@@ -103,16 +103,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "5:00 PM",
   ];
 
-  // Solo los viernes (getDay() === 5) de 10:00 AM a 4:00 PM
-  const fridayTimeSlots = [
-    "10:00 AM",
-    "11:00 AM",
-    "12:00 PM",
-    "1:00 PM",
-    "2:00 PM",
-    "3:00 PM",
-    "4:00 PM",
-  ];
+  // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
 
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
     const today = new Date();
@@ -240,32 +231,29 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Determinar si es domingo o viernes para usar horarios correctos
+        // Determinar si es domingo para usar horarios correctos
         const selectedDate = new Date(date + "T00:00:00");
         const isSunday = selectedDate.getDay() === 0;
-        const isFriday = selectedDate.getDay() === 5;
-        const slotsToUse = isSunday ? sundayTimeSlots : isFriday ? fridayTimeSlots : timeSlots;
+        const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
         return filterPastTimeSlots(date, new Set(slotsToUse));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
       
-      // Determinar si es domingo o viernes para usar horarios correctos
+      // Determinar si es domingo para usar horarios correctos
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      const isFriday = selectedDate.getDay() === 5;
-      const slotsToUse = isSunday ? sundayTimeSlots : isFriday ? fridayTimeSlots : timeSlots;
+      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
       
       const available = new Set<string>(slotsToUse.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Determinar si es domingo o viernes para usar horarios correctos
+      // Determinar si es domingo para usar horarios correctos
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      const isFriday = selectedDate.getDay() === 5;
-      const slotsToUse = isSunday ? sundayTimeSlots : isFriday ? fridayTimeSlots : timeSlots;
+      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
       return filterPastTimeSlots(date, new Set(slotsToUse));
     }
   };
@@ -645,9 +633,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       if (isSunday) {
                         return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
                       }
-                      if (isFriday) {
-                        return "Horarios de viernes: 10:00 AM - 4:00 PM (citas de 1 hora)";
-                      }
+                      // Viernes usa horario estándar
                       return "Horarios disponibles (citas de 1 hora)";
                     })()} 
                   </p>
@@ -663,8 +649,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         if (!formData.date) return timeSlots;
                         const selectedDate = new Date(formData.date + "T00:00:00");
                         const isSunday = selectedDate.getDay() === 0;
-                        const isFriday = selectedDate.getDay() === 5;
-                        return isSunday ? sundayTimeSlots : isFriday ? fridayTimeSlots : timeSlots;
+                        // Viernes usa horario estándar
+                        return isSunday ? sundayTimeSlots : timeSlots;
                       })().map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
