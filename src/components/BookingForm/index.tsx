@@ -629,7 +629,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
-                      const isFriday = selectedDate.getDay() === 5;
                       if (isSunday) {
                         return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
                       }
