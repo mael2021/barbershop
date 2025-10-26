@@ -37,13 +37,6 @@ export const services: Service[] = [
     image: "/images/services/desvanecido-barba.jpg",
   },
   {
-    name: "Limpieza de contorno",
-    description: "Limpieza de contorno facial y cuidado de la piel.",
-    price: 30,
-    duration: "20 min",
-    image: "/images/services/limpieza.jpg",
-  },
-  {
     name: "Pigmentación",
     description: "Pigmentación capilar para disimular calvicie o dar densidad visual.",
     price: 30,
