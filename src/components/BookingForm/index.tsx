@@ -223,6 +223,15 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
+      // Determinar si es domingo para marcar como cerrado
+      const selectedDate = new Date(date + "T00:00:00");
+      const isSunday = selectedDate.getDay() === 0;
+      
+      // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
+      if (isSunday) {
+        return new Set();
+      }
+
       const { data, error } = await supabase
         .from("reservations")
         .select("time, status")
@@ -231,30 +240,18 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Determinar si es domingo para usar horarios correctos
-        const selectedDate = new Date(date + "T00:00:00");
-        const isSunday = selectedDate.getDay() === 0;
-        const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
-        return filterPastTimeSlots(date, new Set(slotsToUse));
+        // Usar horario estándar para días no domingo
+        return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      
-      // Determinar si es domingo para usar horarios correctos
-      const selectedDate = new Date(date + "T00:00:00");
-      const isSunday = selectedDate.getDay() === 0;
-      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
-      
-      const available = new Set<string>(slotsToUse.filter((t) => !reservedTimes.has(t)));
+      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Determinar si es domingo para usar horarios correctos
-      const selectedDate = new Date(date + "T00:00:00");
-      const isSunday = selectedDate.getDay() === 0;
-      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
-      return filterPastTimeSlots(date, new Set(slotsToUse));
+      // Usar horario estándar para días no domingo
+      return filterPastTimeSlots(date, new Set(timeSlots));
     }
   };
 

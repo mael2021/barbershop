@@ -91,6 +91,9 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
     
+    // Deshabilitar domingos
+    if (date.getDay() === 0) return true;
+    
     // Verificar fecha mínima si se proporciona
     if (minDate) {
       const minDateObj = new Date(minDate + "T00:00:00");
