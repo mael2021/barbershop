@@ -101,6 +101,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "3:00 PM",
     "4:00 PM",
     "5:00 PM",
+    "6:00 PM",
   ];
 
   // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
@@ -223,14 +224,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
-      // Determinar si es domingo para marcar como cerrado
+      // Determinar si es domingo para usar horarios especiales
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      
-      // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
-      if (isSunday) {
-        return new Set();
-      }
+
+      // Seleccionar el arreglo de horarios apropiado
+      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
 
       const { data, error } = await supabase
         .from("reservations")
@@ -240,18 +239,19 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Usar horario estándar para días no domingo
-        return filterPastTimeSlots(date, new Set(timeSlots));
+        return filterPastTimeSlots(date, new Set(slotsToUse));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
+      const available = new Set<string>(slotsToUse.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Usar horario estándar para días no domingo
-      return filterPastTimeSlots(date, new Set(timeSlots));
+      const selectedDate = new Date(date + "T00:00:00");
+      const isSunday = selectedDate.getDay() === 0;
+      const slotsToUse = isSunday ? sundayTimeSlots : timeSlots;
+      return filterPastTimeSlots(date, new Set(slotsToUse));
     }
   };
 
@@ -627,11 +627,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
                       if (isSunday) {
-                        return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
+                        return "Horarios de domingo: 11:00 AM - 6:00 PM (citas de 1 hora)";
                       }
                       // Viernes usa horario estándar
                       return "Horarios disponibles (citas de 1 hora)";
-                    })()} 
+                    })()}
                   </p>
                 </div>
 
