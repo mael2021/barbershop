@@ -223,12 +223,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
-      // Determinar si es domingo para marcar como cerrado
+      // Determinar si es domingo o lunes para marcar como cerrado
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      
-      // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
-      if (isSunday) {
+      const isMonday = selectedDate.getDay() === 1;
+
+      // Si es domingo o lunes, devolver un conjunto vacío (sin horarios disponibles)
+      if (isSunday || isMonday) {
         return new Set();
       }
 
@@ -240,7 +241,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Usar horario estándar para días no domingo
+        // Usar horario estándar para días no domingo ni lunes
         return filterPastTimeSlots(date, new Set(timeSlots));
       }
 
@@ -250,7 +251,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Usar horario estándar para días no domingo
+      // Usar horario estándar para días no domingo ni lunes
       return filterPastTimeSlots(date, new Set(timeSlots));
     }
   };
@@ -625,13 +626,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     {(() => {
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
                       const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      if (isSunday) {
-                        return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
+                      const dayOfWeek = selectedDate.getDay();
+                      if (dayOfWeek === 0 || dayOfWeek === 1) {
+                        return "Lo sentimos, los domingos y lunes estamos cerrados";
                       }
                       // Viernes usa horario estándar
                       return "Horarios disponibles (citas de 1 hora)";
-                    })()} 
+                    })()}
                   </p>
                 </div>
 
@@ -644,9 +645,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         // Determinar qué horarios mostrar según el día seleccionado
                         if (!formData.date) return timeSlots;
                         const selectedDate = new Date(formData.date + "T00:00:00");
-                        const isSunday = selectedDate.getDay() === 0;
+                        const dayOfWeek = selectedDate.getDay();
+                        // Domingos y lunes cerrados - retornar array vacío
+                        if (dayOfWeek === 0 || dayOfWeek === 1) return [];
                         // Viernes usa horario estándar
-                        return isSunday ? sundayTimeSlots : timeSlots;
+                        return timeSlots;
                       })().map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
@@ -675,10 +678,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     {(() => {
                       if (!formData.date) return null;
                       const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      
-                      // Solo mostrar el botón de WhatsApp en días normales (no domingos)
-                      if (isSunday) return null;
+                      const dayOfWeek = selectedDate.getDay();
+
+                      // Solo mostrar el botón de WhatsApp en días normales (no domingos ni lunes)
+                      if (dayOfWeek === 0 || dayOfWeek === 1) return null;
                       
                       return (
                         <div className="mt-6 pt-4 border-t border-gray-600/30">
