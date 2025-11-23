@@ -155,10 +155,12 @@ npm run build
 ## 🐛 Solución de Problemas
 
 ### Token Expirado:
+
 - El sistema detectará automáticamente y renovará
 - Si falla, notificará para reautenticación manual
 
 ### Error de Conexión:
+
 - Verifica variables de entorno
 - Confirma que la función edge esté desplegada
 - Revisa logs en Supabase Dashboard
@@ -166,6 +168,7 @@ npm run build
 ## 📞 Soporte
 
 Para problemas técnicos, revisa:
+
 1. Logs de la función edge en Supabase
 2. Estado de las variables de entorno
 3. Configuración de Google OAuth

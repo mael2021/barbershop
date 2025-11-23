@@ -16,7 +16,8 @@ export const InfoSection = () => {
             title="Abrir en Google Maps"
             className="max-w-sm text-center text-sm text-balance text-gray-300 hover:underline hover:underline-offset-4"
           >
-            🏠 1° de Mayo 1, Sexto Barrio Emiliano Zapata,<br/>
+            🏠 1° de Mayo 1, Sexto Barrio Emiliano Zapata,
+            <br />
             90150 Panotla, Tlax. 🇲🇽
           </a>
         </article>

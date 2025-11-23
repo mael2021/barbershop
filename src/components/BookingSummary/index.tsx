@@ -28,7 +28,7 @@ export const BookingSummary = ({ services: selectedServices, date, time }: Booki
       const hours = Math.floor(minutes / 60);
       const remainingMinutes = minutes % 60;
       if (remainingMinutes === 0) {
-        return `${hours} hora${hours > 1 ? 's' : ''}`;
+        return `${hours} hora${hours > 1 ? "s" : ""}`;
       }
       return `${hours}h ${remainingMinutes}min`;
     }
@@ -42,7 +42,7 @@ export const BookingSummary = ({ services: selectedServices, date, time }: Booki
         <div>
           <span className="text-sm font-bold text-gray-300 uppercase">Servicios:</span>
           <div className="mt-1 space-y-1">
-            {selectedServices.map((serviceName) => {
+            {selectedServices.map(serviceName => {
               const service = services.find(s => s.name === serviceName);
               return (
                 <div key={serviceName} className="flex justify-between text-sm">
@@ -51,7 +51,7 @@ export const BookingSummary = ({ services: selectedServices, date, time }: Booki
                 </div>
               );
             })}
-            <div className="border-t border-gray-600 pt-1 flex justify-between font-bold">
+            <div className="flex justify-between border-t border-gray-600 pt-1 font-bold">
               <span className="text-white">Total:</span>
               <span className="text-spray-orange">${totalPrice} MXN</span>
             </div>

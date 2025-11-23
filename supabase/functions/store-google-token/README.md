@@ -14,25 +14,30 @@ GOOGLE_CLIENT_SECRET=tu_google_client_secret
 ## Funcionalidades
 
 ### 1. Almacenamiento de Tokens (`action: "store"`)
+
 - Guarda access token y refresh token en la base de datos
 - Soporta tokens específicos de usuario y globales
 
 ### 2. Recuperación con Renovación Automática (`action: "retrieve"`)
+
 - Obtiene el token válido
 - Renueva automáticamente si está expirado
 - Actualiza la base de datos con el nuevo token
 
 ### 3. Verificación de Estado (`action: "check_token_status"`)
+
 - Verifica si el token está válido
 - Renueva automáticamente si es necesario
 - Retorna estado del token
 
 ### 4. Obtener Eventos (`action: "get_events"`)
+
 - Obtiene eventos del calendario
 - Usa token renovado automáticamente
 - Maneja errores de autenticación
 
 ### 5. Crear Eventos (`action: "create_event"`)
+
 - Crea eventos en Google Calendar
 - Usa token renovado automáticamente
 - Maneja errores de autenticación
@@ -73,4 +78,4 @@ const response = await fetch(`${SUPABASE_URL}/functions/v1/store-google-token`, 
     action: "retrieve", // Obtiene token con renovación automática
   }),
 });
-``` 
+```

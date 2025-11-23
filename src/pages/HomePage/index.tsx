@@ -27,11 +27,7 @@ export const HomePage = () => {
       <SupportiveCTA />
       <InfoSection />
       <Footer />
-      <BookingForm
-        isOpen={isBookingOpen}
-        onClose={handleCloseBooking}
-        preSelectedService={selectedService}
-      />
+      <BookingForm isOpen={isBookingOpen} onClose={handleCloseBooking} preSelectedService={selectedService} />
     </div>
   );
 };

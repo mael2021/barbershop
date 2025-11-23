@@ -74,8 +74,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   const getTodayDate = () => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -93,56 +93,44 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "8:00 PM",
   ];
 
-  const sundayTimeSlots = [
-    "11:00 AM",
-    "12:00 PM",
-    "1:00 PM",
-    "2:00 PM",
-    "3:00 PM",
-    "4:00 PM",
-    "5:00 PM",
-  ];
-
-  // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
-
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
     const today = new Date();
     const selectedDate = new Date(date + "T00:00:00");
-    
+
     if (selectedDate.toDateString() !== today.toDateString()) {
       return availableSlots;
     }
-    
+
     const currentHour = today.getHours();
     const currentMinute = today.getMinutes();
-    
+
     const filteredSlots = new Set<string>();
-    
+
     availableSlots.forEach(timeSlot => {
       const timeMatch = timeSlot.match(/(\d+):(\d+)\s*(AM|PM)/);
       if (!timeMatch) return;
-      
+
       const [, hours, minutes, period] = timeMatch;
       let slotHour = parseInt(hours);
       const slotMinute = parseInt(minutes);
-      
+
       if (period === "AM" && slotHour === 12) {
         slotHour = 0;
       } else if (period === "PM" && slotHour !== 12) {
         slotHour += 12;
       }
-      
+
       const slotEndTime = new Date();
-      slotEndTime.setHours(slotHour, slotMinute + 30, 0, 0); 
-      
+      slotEndTime.setHours(slotHour, slotMinute + 30, 0, 0);
+
       const currentTime = new Date();
       currentTime.setHours(currentHour, currentMinute, 0, 0);
-      
+
       if (slotEndTime > currentTime) {
         filteredSlots.add(timeSlot);
       }
     });
-    
+
     return filteredSlots;
   };
 
@@ -157,7 +145,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para remover un servicio
   const removeService = (serviceName: string) => {
     const currentServices = formData.services || [];
-    setValue("services", currentServices.filter(s => s !== serviceName), { shouldValidate: true });
+    setValue(
+      "services",
+      currentServices.filter(s => s !== serviceName),
+      { shouldValidate: true }
+    );
   };
 
   // Función para obtener el precio total
@@ -223,12 +215,14 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
-      // Determinar si es domingo para marcar como cerrado
+      // Determinar si es domingo o lunes para marcar como cerrado
       const selectedDate = new Date(date + "T00:00:00");
-      const isSunday = selectedDate.getDay() === 0;
-      
-      // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
-      if (isSunday) {
+      const dayOfWeek = selectedDate.getDay();
+      const isSunday = dayOfWeek === 0;
+      const isMonday = dayOfWeek === 1;
+
+      // Si es domingo o lunes, devolver un conjunto vacío (sin horarios disponibles)
+      if (isSunday || isMonday) {
         return new Set();
       }
 
@@ -245,7 +239,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
+      const available = new Set<string>(timeSlots.filter(t => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
@@ -391,15 +385,17 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
         if (!response.ok) {
           const errorData = await response.json();
-          const errorMessage = typeof errorData.error === 'object' 
+          const errorMessage =
+            typeof errorData.error === "object"
               ? errorData.error.message || JSON.stringify(errorData.error)
               : errorData.error;
 
           console.error("Error creating Google Calendar event:", errorMessage);
-          if (errorMessage && errorMessage.includes('ADMIN_REAUTH_REQUIRED')) {
+          if (errorMessage && errorMessage.includes("ADMIN_REAUTH_REQUIRED")) {
             toast.warning({
               text: "Reserva creada con advertencia",
-              description: "La reserva se guardó, pero hay un problema con la sincronización de Google. Contacta al administrador.",
+              description:
+                "La reserva se guardó, pero hay un problema con la sincronización de Google. Contacta al administrador.",
             });
           } else {
             toast.warning({
@@ -411,7 +407,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
           const result = await response.json();
           console.log("Evento creado exitosamente:", result);
         }
-
       } catch (calendarError) {
         console.error("Error creating Google Calendar event:", calendarError);
         toast.warning({
@@ -441,10 +436,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   const openWhatsApp = () => {
     const phoneNumber = "5212462021022";
     const message = encodeURIComponent(
-      `¡Hola! 👋\n\nEstoy interesado en agendar una cita después de las 8:00 PM.\n\n📅 Fecha deseada: ${formData.date || 'Por definir'}\n💇‍♂️ Servicios: ${formData.services?.join(', ') || 'Por definir'}\n\n¿Hay disponibilidad?`
+      `¡Hola! 👋\n\nEstoy interesado en agendar una cita después de las 8:00 PM.\n\n📅 Fecha deseada: ${formData.date || "Por definir"}\n💇‍♂️ Servicios: ${formData.services?.join(", ") || "Por definir"}\n\n¿Hay disponibilidad?`
     );
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(whatsappUrl, "_blank");
   };
 
   if (!isOpen) return null;
@@ -493,10 +488,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   {/* Servicios seleccionados */}
                   {formData.services && formData.services.length > 0 ? (
                     <div className="space-y-3">
-                      {formData.services.map((serviceName) => {
+                      {formData.services.map(serviceName => {
                         const service = services.find(s => s.name === serviceName);
                         return (
-                          <div key={serviceName} className="flex items-center justify-between rounded-lg border border-gray-600 bg-graffiti-dark p-4">
+                          <div
+                            key={serviceName}
+                            className="flex items-center justify-between rounded-lg border border-gray-600 bg-graffiti-dark p-4"
+                          >
                             <div>
                               <h5 className="font-bold text-white uppercase">{serviceName}</h5>
                               <div className="flex items-center gap-4 text-sm text-gray-400">
@@ -509,25 +507,25 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                               size="sm"
                               variant="ghost"
                               onClick={() => removeService(serviceName)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                              className="text-red-400 hover:bg-red-400/10 hover:text-red-300"
                             >
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
                         );
                       })}
-                      
+
                       {/* Total */}
                       <div className="rounded-lg border border-spray-orange/30 bg-spray-orange/5 p-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-white font-medium">Total:</span>
-                          <span className="text-spray-orange font-bold text-lg">${getTotalPrice()} MXN</span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-white">Total:</span>
+                          <span className="text-lg font-bold text-spray-orange">${getTotalPrice()} MXN</span>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center p-8 text-gray-400">
-                      <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <div className="p-8 text-center text-gray-400">
+                      <Calendar className="mx-auto mb-4 h-12 w-12 opacity-50" />
                       <p>No has seleccionado ningún servicio</p>
                     </div>
                   )}
@@ -536,11 +534,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <div className="text-center">
                     <Select
                       value=""
-                      onValueChange={(value) => {
+                      onValueChange={value => {
                         if (value) addService(value);
                       }}
                     >
-                      <SelectTrigger className="border-gray-600 bg-graffiti-dark text-white hover:border-spray-orange transition-colors">
+                      <SelectTrigger className="border-gray-600 bg-graffiti-dark text-white transition-colors hover:border-spray-orange">
                         <div className="flex items-center gap-2">
                           <Plus className="h-4 w-4 text-spray-orange" />
                           <span>Agregar servicio</span>
@@ -548,26 +546,28 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       </SelectTrigger>
                       <SelectContent className="border-gray-600 bg-graffiti-dark">
                         {services
-                          .filter(service => 
-                            !excludedServices.includes(service.name) && 
-                            !formData.services?.includes(service.name)
+                          .filter(
+                            service =>
+                              !excludedServices.includes(service.name) && !formData.services?.includes(service.name)
                           )
-                          .map((service) => (
-                            <SelectItem 
-                              key={service.name} 
-                              value={service.name} 
+                          .map(service => (
+                            <SelectItem
+                              key={service.name}
+                              value={service.name}
                               className="text-white hover:bg-gray-600 focus:bg-gray-600"
                             >
                               <div className="flex flex-col">
                                 <span className="font-medium">{service.name}</span>
-                                <span className="text-sm text-gray-400">${service.price} MXN • {service.duration}</span>
+                                <span className="text-sm text-gray-400">
+                                  ${service.price} MXN • {service.duration}
+                                </span>
                               </div>
                             </SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   {errors.services && <p className="mt-1 text-sm text-red-500">{errors.services.message}</p>}
                 </div>
               </div>
@@ -589,7 +589,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <div className="hidden md:block">
                     <CalendarComponent
                       value={formData.date}
-                      onChange={(date) => setValue("date", date, { shouldValidate: true })}
+                      onChange={date => setValue("date", date, { shouldValidate: true })}
                       minDate={new Date().toISOString().split("T")[0]}
                     />
                   </div>
@@ -604,10 +604,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         errors.date ? "border-red-500 focus-visible:ring-red-500" : ""
                       }`}
                       min={getTodayDate()}
-
                     />
                   </div>
-                  
+
                   {errors.date && <p className="mt-1 text-sm text-red-500">{errors.date.message}</p>}
                 </div>
               </div>
@@ -621,18 +620,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <Clock className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="mb-2 text-2xl font-bold text-white">Selecciona tu hora</h3>
-                  <p className="text-white">
-                    {(() => {
-                      if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
-                      const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      if (isSunday) {
-                        return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
-                      }
-                      // Viernes usa horario estándar
-                      return "Horarios disponibles (citas de 1 hora)";
-                    })()} 
-                  </p>
+                  <p className="text-white">Horarios disponibles (citas de 1 hora)</p>
                 </div>
 
                 {isLoadingSlots ? (
@@ -640,14 +628,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {(() => {
-                        // Determinar qué horarios mostrar según el día seleccionado
-                        if (!formData.date) return timeSlots;
-                        const selectedDate = new Date(formData.date + "T00:00:00");
-                        const isSunday = selectedDate.getDay() === 0;
-                        // Viernes usa horario estándar
-                        return isSunday ? sundayTimeSlots : timeSlots;
-                      })().map(time => {
+                      {timeSlots.map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
                           <Button
@@ -670,32 +651,34 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         );
                       })}
                     </div>
-                    
+
                     {/* Botón de WhatsApp para horarios después de 8:00 PM (solo en días normales) */}
                     {(() => {
                       if (!formData.date) return null;
                       const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      
-                      // Solo mostrar el botón de WhatsApp en días normales (no domingos)
-                      if (isSunday) return null;
-                      
+                      const dayOfWeek = selectedDate.getDay();
+                      const isSunday = dayOfWeek === 0;
+                      const isMonday = dayOfWeek === 1;
+
+                      // Solo mostrar el botón de WhatsApp en días normales (no domingos ni lunes)
+                      if (isSunday || isMonday) return null;
+
                       return (
-                        <div className="mt-6 pt-4 border-t border-gray-600/30">
-                          <div className="text-center mb-2">
+                        <div className="mt-6 border-t border-gray-600/30 pt-4">
+                          <div className="mb-2 text-center">
                             <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
                           </div>
                           <Button
                             type="button"
                             onClick={openWhatsApp}
-                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
+                            className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-green-600 py-2 text-sm text-white transition-all duration-300 hover:from-green-600 hover:to-green-700"
                           >
                             <MessageCircle className="h-4 w-4" />
                             Consultar disponibilidad por WhatsApp
                           </Button>
                         </div>
                       );
-                    })()} 
+                    })()}
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
