@@ -51,19 +51,11 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
       const selectedDateAtMidnight = new Date(date);
       selectedDateAtMidnight.setHours(0, 0, 0, 0);
       minDateObj.setHours(0, 0, 0, 0);
-      
+
       if (selectedDateAtMidnight < minDateObj) return;
     }
-    
-    // No permitir seleccionar fechas pasadas (pero SÍ permitir hoy)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDateAtMidnight = new Date(date);
-    selectedDateAtMidnight.setHours(0, 0, 0, 0);
-    
-    // Solo bloquear si es estrictamente menor que hoy (no igual)
-    if (selectedDateAtMidnight < today) return;
 
+    // Permitir seleccionar cualquier fecha (incluidas pasadas)
     setSelectedDate(date);
     if (onChange) {
       const year = date.getFullYear();
@@ -90,28 +82,19 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
 
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
-    
-    // Deshabilitar domingos
-    if (date.getDay() === 0) return true;
-    
+
     // Verificar fecha mínima si se proporciona
     if (minDate) {
       const minDateObj = new Date(minDate + "T00:00:00");
       const dateAtMidnight = new Date(date);
       dateAtMidnight.setHours(0, 0, 0, 0);
       minDateObj.setHours(0, 0, 0, 0);
-      
+
       if (dateAtMidnight < minDateObj) return true;
     }
-    
-    // Deshabilitar fechas pasadas (pero NO hoy)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dateAtMidnight = new Date(date);
-    dateAtMidnight.setHours(0, 0, 0, 0);
-    
-    // Solo deshabilitar si es estrictamente menor que hoy (no igual)
-    return dateAtMidnight < today;
+
+    // Permitir todas las fechas (incluidas pasadas y domingos)
+    return false;
   };
 
   const isSameDay = (date1: Date | null, date2: Date | null) => {
@@ -164,13 +147,10 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
 
         {/* Días de la semana */}
         <div className="grid grid-cols-7 gap-1 mb-3 px-1">
-          {dayNames.map((day, index) => (
+          {dayNames.map((day) => (
             <div
               key={day}
-              className={cn(
-                "text-center text-xs font-bold py-2 rounded-lg",
-                index === 0 ? "text-red-400 bg-red-500/5" : "text-gray-400 bg-gray-700/20"
-              )}
+              className="text-center text-xs font-bold py-2 rounded-lg text-gray-400 bg-gray-700/20"
             >
               {day}
             </div>
@@ -199,9 +179,7 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
                     // Día actual
                     isToday(date) && !isSameDay(date, selectedDate)
                       ? "bg-gradient-to-r from-neon-green/15 to-urban-purple/15 text-neon-green border-2 border-neon-green/40 shadow-lg"
-                      : "",
-                    // Domingos
-                    date.getDay() === 0 && "bg-red-900/10 text-red-400/50 border border-red-500/20"
+                      : ""
                   )}
                 >
                   {date.getDate()}
@@ -219,13 +197,6 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
           ))}
         </div>
 
-        {/* Mensaje informativo más elegante */}
-        <div className="mt-4 flex justify-center">
-          <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-600/30">
-            <div className="w-2 h-2 bg-red-500 rounded-full opacity-70 animate-pulse"></div>
-            <span className="font-medium">Domingos cerrado</span>
-          </div>
-        </div>
       </div>
     </div>
   );

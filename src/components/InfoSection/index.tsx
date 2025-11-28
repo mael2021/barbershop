@@ -25,10 +25,8 @@ export const InfoSection = () => {
           <h3 className="font-graffiti graffiti-shadow mb-2 text-3xl font-bold text-pretty text-spray-orange uppercase">
             🕒 Horarios
           </h3>
-          <p className="text-center text-sm text-gray-300">⏰ Lunes a Jueves y Sábado: 10:00 AM - 8:00 PM</p>
-          <p className="text-center text-sm text-gray-300">⏰ Martes: 10:00 AM - 8:00 PM</p>
-          <p className="text-center text-sm text-gray-300">⏰ Viernes: 10:00 AM - 8:00 PM</p>
-          <p className="text-center text-sm text-gray-300">🔒 Domingo: 11:00 AM - 5:00 PM</p>
+          <p className="text-center text-sm text-gray-300">⏰ Lunes a Domingo: 10:00 AM - 8:00 PM</p>
+          <p className="text-center text-sm text-gray-400 text-xs mt-1">¡Abierto todos los días!</p>
         </article>
 
         <article className="flex flex-col items-center gap-y-2">
