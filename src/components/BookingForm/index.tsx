@@ -93,18 +93,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "8:00 PM",
   ];
 
-  const sundayTimeSlots = [
-    "11:00 AM",
-    "12:00 PM",
-    "1:00 PM",
-    "2:00 PM",
-    "3:00 PM",
-    "4:00 PM",
-    "5:00 PM",
-  ];
-
-  // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
-
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
     const today = new Date();
     const selectedDate = new Date(date + "T00:00:00");
@@ -600,11 +588,25 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <Input
                       type="date"
                       {...register("date")}
+                      onChange={(e) => {
+                        const selectedDate = new Date(e.target.value + "T00:00:00");
+                        const isSunday = selectedDate.getDay() === 0;
+
+                        if (isSunday) {
+                          toast.error({
+                            text: "Domingo cerrado",
+                            description: "Los domingos no trabajamos. Por favor selecciona otro día.",
+                          });
+                          setValue("date", "", { shouldValidate: true });
+                          e.target.value = "";
+                        } else {
+                          setValue("date", e.target.value, { shouldValidate: true });
+                        }
+                      }}
                       className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
                         errors.date ? "border-red-500 focus-visible:ring-red-500" : ""
                       }`}
                       min={getTodayDate()}
-
                     />
                   </div>
                   
@@ -621,18 +623,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     <Clock className="h-8 w-8 text-white" />
                   </div>
                   <h3 className="mb-2 text-2xl font-bold text-white">Selecciona tu hora</h3>
-                  <p className="text-white">
-                    {(() => {
-                      if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
-                      const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      if (isSunday) {
-                        return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
-                      }
-                      // Viernes usa horario estándar
-                      return "Horarios disponibles (citas de 1 hora)";
-                    })()} 
-                  </p>
+                  <p className="text-white">Horarios disponibles: 10:00 AM - 8:00 PM (citas de 1 hora)</p>
                 </div>
 
                 {isLoadingSlots ? (
@@ -640,14 +631,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {(() => {
-                        // Determinar qué horarios mostrar según el día seleccionado
-                        if (!formData.date) return timeSlots;
-                        const selectedDate = new Date(formData.date + "T00:00:00");
-                        const isSunday = selectedDate.getDay() === 0;
-                        // Viernes usa horario estándar
-                        return isSunday ? sundayTimeSlots : timeSlots;
-                      })().map(time => {
+                      {timeSlots.map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
                           <Button
@@ -670,32 +654,24 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         );
                       })}
                     </div>
-                    
-                    {/* Botón de WhatsApp para horarios después de 8:00 PM (solo en días normales) */}
-                    {(() => {
-                      if (!formData.date) return null;
-                      const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      
-                      // Solo mostrar el botón de WhatsApp en días normales (no domingos)
-                      if (isSunday) return null;
-                      
-                      return (
-                        <div className="mt-6 pt-4 border-t border-gray-600/30">
-                          <div className="text-center mb-2">
-                            <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={openWhatsApp}
-                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                            Consultar disponibilidad por WhatsApp
-                          </Button>
+
+
+                    {/* Botón de WhatsApp para horarios después de 8:00 PM */}
+                    {formData.date && (
+                      <div className="mt-6 pt-4 border-t border-gray-600/30">
+                        <div className="text-center mb-2">
+                          <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
                         </div>
-                      );
-                    })()} 
+                        <Button
+                          type="button"
+                          onClick={openWhatsApp}
+                          className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Consultar disponibilidad por WhatsApp
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
