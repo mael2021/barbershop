@@ -88,11 +88,28 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
 
   const dayNames = ["D", "L", "M", "X", "J", "V", "S"];
 
+  // Función para verificar si es un día festivo cerrado
+  const isHoliday = (date: Date) => {
+    const month = date.getMonth(); // 0-11
+    const day = date.getDate();
+
+    // 25 de diciembre (mes 11 = diciembre)
+    if (month === 11 && day === 25) return true;
+
+    // 1 de enero (mes 0 = enero)
+    if (month === 0 && day === 1) return true;
+
+    return false;
+  };
+
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
-    
+
     // Deshabilitar domingos
     if (date.getDay() === 0) return true;
+
+    // Deshabilitar días festivos cerrados
+    if (isHoliday(date)) return true;
     
     // Verificar fecha mínima si se proporciona
     if (minDate) {
@@ -201,7 +218,9 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
                       ? "bg-gradient-to-r from-neon-green/15 to-urban-purple/15 text-neon-green border-2 border-neon-green/40 shadow-lg"
                       : "",
                     // Domingos
-                    date.getDay() === 0 && "bg-red-900/10 text-red-400/50 border border-red-500/20"
+                    date.getDay() === 0 && "bg-red-900/10 text-red-400/50 border border-red-500/20",
+                    // Días festivos cerrados
+                    isHoliday(date) && "bg-orange-900/20 text-orange-400/50 border border-orange-500/30"
                   )}
                 >
                   {date.getDate()}
@@ -220,10 +239,14 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
         </div>
 
         {/* Mensaje informativo más elegante */}
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex flex-col gap-2 items-center">
           <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-600/30">
             <div className="w-2 h-2 bg-red-500 rounded-full opacity-70 animate-pulse"></div>
             <span className="font-medium">Domingos cerrado</span>
+          </div>
+          <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-600/30">
+            <div className="w-2 h-2 bg-orange-500 rounded-full opacity-70 animate-pulse"></div>
+            <span className="font-medium">Cerrado: 25 Dic y 1 Ene</span>
           </div>
         </div>
       </div>

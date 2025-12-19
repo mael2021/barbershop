@@ -220,15 +220,34 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     }
   }, [isOpen, reset, setCurrentStep]);
 
+  // Función para verificar si es un día festivo cerrado
+  const isHoliday = (date: Date) => {
+    const month = date.getMonth(); // 0-11
+    const day = date.getDate();
+
+    // 25 de diciembre (mes 11 = diciembre)
+    if (month === 11 && day === 25) return true;
+
+    // 1 de enero (mes 0 = enero)
+    if (month === 0 && day === 1) return true;
+
+    return false;
+  };
+
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
       // Determinar si es domingo para marcar como cerrado
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      
+
       // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
       if (isSunday) {
+        return new Set();
+      }
+
+      // Si es un día festivo cerrado, devolver conjunto vacío
+      if (isHoliday(selectedDate)) {
         return new Set();
       }
 
