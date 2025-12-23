@@ -103,6 +103,20 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "5:00 PM",
   ];
 
+  const christmasEveTimeSlots = [
+    "7:00 AM",
+    "8:00 AM",
+    "9:00 AM",
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "1:00 PM",
+    "2:00 PM",
+    "3:00 PM",
+    "4:00 PM",
+    "5:00 PM",
+  ];
+
   // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
 
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
@@ -242,6 +256,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         return new Set();
       }
 
+      // Determinar qué horarios usar según el día
+      let availableTimeSlots = timeSlots;
+      if (date === "2025-12-24") {
+        availableTimeSlots = christmasEveTimeSlots;
+      }
+
       const { data, error } = await supabase
         .from("reservations")
         .select("time, status")
@@ -250,18 +270,19 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Usar horario estándar para días no domingo
-        return filterPastTimeSlots(date, new Set(timeSlots));
+        // Usar horario correspondiente al día
+        return filterPastTimeSlots(date, new Set(availableTimeSlots));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
+      const available = new Set<string>(availableTimeSlots.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Usar horario estándar para días no domingo
-      return filterPastTimeSlots(date, new Set(timeSlots));
+      // Usar horario correspondiente al día
+      const availableTimeSlots = date === "2025-12-24" ? christmasEveTimeSlots : timeSlots;
+      return filterPastTimeSlots(date, new Set(availableTimeSlots));
     }
   };
 
@@ -643,6 +664,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         return "Día festivo - Cerrado";
                       }
 
+                      // Verificar si es Nochebuena (24 dic)
+                      if (formData.date === "2025-12-24") {
+                        return "Horario especial Nochebuena: 7:00 AM - 5:00 PM (citas de 1 hora)";
+                      }
+
                       if (isSunday) {
                         return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
                       }
@@ -650,31 +676,6 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       return "Horarios disponibles (citas de 1 hora)";
                     })()}
                   </p>
-                </div>
-
-                {/* Navigation Buttons - Arriba */}
-                <div className="flex justify-between pb-4 border-b border-gray-600/30">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={prevStep}
-                    className="cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange"
-                  >
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    Atrás
-                  </Button>
-
-                  <Button
-                    type="button"
-                    onClick={nextStep}
-                    disabled={!isCurrentStepValid}
-                    className={`cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 ${
-                      !isCurrentStepValid ? "opacity-50" : ""
-                    }`}
-                  >
-                    Siguiente
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
                 </div>
 
                 {isLoadingSlots ? (
@@ -685,6 +686,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       {(() => {
                         // Determinar qué horarios mostrar según el día seleccionado
                         if (!formData.date) return timeSlots;
+
+                        // Verificar si es Nochebuena
+                        if (formData.date === "2025-12-24") {
+                          return christmasEveTimeSlots;
+                        }
+
                         const selectedDate = new Date(formData.date + "T00:00:00");
                         const isSunday = selectedDate.getDay() === 0;
                         // Viernes usa horario estándar
@@ -716,6 +723,31 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
 
+                {/* Navigation Buttons - En medio */}
+                <div className="flex justify-between pt-4 border-t border-gray-600/30">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={prevStep}
+                    className="cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange"
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Atrás
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    disabled={!isCurrentStepValid}
+                    className={`cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 ${
+                      !isCurrentStepValid ? "opacity-50" : ""
+                    }`}
+                  >
+                    Siguiente
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+
                 {/* Botón de WhatsApp para horarios después de 8:00 PM (solo en días normales) - Al final */}
                 {(() => {
                   if (!formData.date) return null;
@@ -726,7 +758,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   if (isSunday) return null;
 
                   return (
-                    <div className="mt-6 pt-4 border-t border-gray-600/30">
+                    <div className="pt-4 border-t border-gray-600/30">
                       <div className="text-center mb-2">
                         <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
                       </div>
