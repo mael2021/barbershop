@@ -7,9 +7,10 @@ interface CalendarProps {
   onChange?: (date: string) => void;
   minDate?: string;
   className?: string;
+  disabledDates?: string[]; // Array de fechas en formato "YYYY-MM-DD"
 }
 
-export const Calendar = ({ value, onChange, minDate, className }: CalendarProps) => {
+export const Calendar = ({ value, onChange, minDate, className, disabledDates = [] }: CalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -90,26 +91,33 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
 
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
-    
+
     // Deshabilitar domingos
     if (date.getDay() === 0) return true;
-    
+
+    // Deshabilitar días festivos
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    if (disabledDates.includes(dateStr)) return true;
+
     // Verificar fecha mínima si se proporciona
     if (minDate) {
       const minDateObj = new Date(minDate + "T00:00:00");
       const dateAtMidnight = new Date(date);
       dateAtMidnight.setHours(0, 0, 0, 0);
       minDateObj.setHours(0, 0, 0, 0);
-      
+
       if (dateAtMidnight < minDateObj) return true;
     }
-    
+
     // Deshabilitar fechas pasadas (pero NO hoy)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dateAtMidnight = new Date(date);
     dateAtMidnight.setHours(0, 0, 0, 0);
-    
+
     // Solo deshabilitar si es estrictamente menor que hoy (no igual)
     return dateAtMidnight < today;
   };
@@ -223,7 +231,9 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
         <div className="mt-4 flex justify-center">
           <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-600/30">
             <div className="w-2 h-2 bg-red-500 rounded-full opacity-70 animate-pulse"></div>
-            <span className="font-medium">Domingos cerrado</span>
+            <span className="font-medium">
+              {disabledDates.length > 0 ? "Domingos y días festivos cerrados" : "Domingos cerrado"}
+            </span>
           </div>
         </div>
       </div>

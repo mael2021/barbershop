@@ -220,15 +220,25 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     }
   }, [isOpen, reset, setCurrentStep]);
 
+  // Función para verificar si una fecha es día festivo cerrado
+  const isHolidayClosed = (date: string): boolean => {
+    // Días festivos cerrados
+    const holidays = [
+      "2025-12-25", // Navidad 2025
+      "2026-01-01", // Año Nuevo 2026
+    ];
+    return holidays.includes(date);
+  };
+
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
       // Determinar si es domingo para marcar como cerrado
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      
-      // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
-      if (isSunday) {
+
+      // Si es domingo o día festivo, devolver un conjunto vacío (sin horarios disponibles)
+      if (isSunday || isHolidayClosed(date)) {
         return new Set();
       }
 
@@ -591,6 +601,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       value={formData.date}
                       onChange={(date) => setValue("date", date, { shouldValidate: true })}
                       minDate={new Date().toISOString().split("T")[0]}
+                      disabledDates={["2025-12-25", "2026-01-01"]}
                     />
                   </div>
 
@@ -626,6 +637,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
+
+                      // Verificar si es día festivo
+                      if (isHolidayClosed(formData.date)) {
+                        return "Día festivo - Cerrado";
+                      }
+
                       if (isSunday) {
                         return "Horarios de domingo: 11:00 AM - 5:00 PM (citas de 1 hora)";
                       }
