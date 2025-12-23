@@ -631,8 +631,33 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       }
                       // Viernes usa horario estándar
                       return "Horarios disponibles (citas de 1 hora)";
-                    })()} 
+                    })()}
                   </p>
+                </div>
+
+                {/* Navigation Buttons - Arriba */}
+                <div className="flex justify-between pb-4 border-b border-gray-600/30">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={prevStep}
+                    className="cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange"
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Atrás
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    disabled={!isCurrentStepValid}
+                    className={`cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 ${
+                      !isCurrentStepValid ? "opacity-50" : ""
+                    }`}
+                  >
+                    Siguiente
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </div>
 
                 {isLoadingSlots ? (
@@ -670,35 +695,35 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                         );
                       })}
                     </div>
-                    
-                    {/* Botón de WhatsApp para horarios después de 8:00 PM (solo en días normales) */}
-                    {(() => {
-                      if (!formData.date) return null;
-                      const selectedDate = new Date(formData.date + "T00:00:00");
-                      const isSunday = selectedDate.getDay() === 0;
-                      
-                      // Solo mostrar el botón de WhatsApp en días normales (no domingos)
-                      if (isSunday) return null;
-                      
-                      return (
-                        <div className="mt-6 pt-4 border-t border-gray-600/30">
-                          <div className="text-center mb-2">
-                            <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={openWhatsApp}
-                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm py-2"
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                            Consultar disponibilidad por WhatsApp
-                          </Button>
-                        </div>
-                      );
-                    })()} 
                   </div>
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
+
+                {/* Botón de WhatsApp para horarios después de 8:00 PM (solo en días normales) - Al final */}
+                {(() => {
+                  if (!formData.date) return null;
+                  const selectedDate = new Date(formData.date + "T00:00:00");
+                  const isSunday = selectedDate.getDay() === 0;
+
+                  // Solo mostrar el botón de WhatsApp en días normales (no domingos)
+                  if (isSunday) return null;
+
+                  return (
+                    <div className="mt-6 pt-4 border-t border-gray-600/30">
+                      <div className="text-center mb-2">
+                        <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={openWhatsApp}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center gap-2 text-xs py-1.5"
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        Consultar disponibilidad por WhatsApp
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -754,43 +779,45 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
               </div>
             )}
 
-            {/* Navigation Buttons */}
-            <div className="mt-8 flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 1}
-                className="cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange disabled:opacity-50"
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Atrás
-              </Button>
-
-              {currentStep < 4 ? (
+            {/* Navigation Buttons - Ocultos en paso 3 porque se muestran arriba */}
+            {currentStep !== 3 && (
+              <div className="mt-8 flex justify-between">
                 <Button
                   type="button"
-                  onClick={nextStep}
-                  disabled={!isCurrentStepValid}
-                  className={`cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 ${
-                    !isCurrentStepValid ? "opacity-50" : ""
-                  }`}
+                  variant="outline"
+                  onClick={prevStep}
+                  disabled={currentStep === 1}
+                  className="cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange disabled:opacity-50"
                 >
-                  Siguiente
-                  <ChevronRight className="ml-1 h-4 w-4" />
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Atrás
                 </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  disabled={!isCurrentStepValid || isSubmitting}
-                  className={`bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 ${
-                    !isCurrentStepValid || isSubmitting ? "opacity-50" : ""
-                  }`}
-                >
-                  {isSubmitting ? "Creando cita..." : "Confirmar cita 🔥"}
-                </Button>
-              )}
-            </div>
+
+                {currentStep < 4 ? (
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    disabled={!isCurrentStepValid}
+                    className={`cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 ${
+                      !isCurrentStepValid ? "opacity-50" : ""
+                    }`}
+                  >
+                    Siguiente
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={!isCurrentStepValid || isSubmitting}
+                    className={`bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 ${
+                      !isCurrentStepValid || isSubmitting ? "opacity-50" : ""
+                    }`}
+                  >
+                    {isSubmitting ? "Creando cita..." : "Confirmar cita 🔥"}
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </form>
       </Card>
