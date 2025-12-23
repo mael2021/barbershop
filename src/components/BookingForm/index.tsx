@@ -103,6 +103,21 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     "5:00 PM",
   ];
 
+  // Horario especial para el 24 de diciembre de 2025 (7:00 AM - 5:00 PM)
+  const christmasEveTimeSlots = [
+    "7:00 AM",
+    "8:00 AM",
+    "9:00 AM",
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "1:00 PM",
+    "2:00 PM",
+    "3:00 PM",
+    "4:00 PM",
+    "5:00 PM",
+  ];
+
   // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
 
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
@@ -226,11 +241,17 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       // Determinar si es domingo para marcar como cerrado
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      
+
       // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
       if (isSunday) {
         return new Set();
       }
+
+      // Verificar si es el 24 de diciembre de 2025 (Nochebuena)
+      const isChristmasEve2025 = date === "2025-12-24";
+
+      // Determinar el conjunto de horarios base según el día
+      const baseTimeSlots = isChristmasEve2025 ? christmasEveTimeSlots : timeSlots;
 
       const { data, error } = await supabase
         .from("reservations")
@@ -240,18 +261,20 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Usar horario estándar para días no domingo
-        return filterPastTimeSlots(date, new Set(timeSlots));
+        // Usar horario correspondiente según el día
+        return filterPastTimeSlots(date, new Set(baseTimeSlots));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
+      const available = new Set<string>(baseTimeSlots.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Usar horario estándar para días no domingo
-      return filterPastTimeSlots(date, new Set(timeSlots));
+      // Usar horario correspondiente según el día
+      const isChristmasEve2025 = date === "2025-12-24";
+      const fallbackSlots = isChristmasEve2025 ? christmasEveTimeSlots : timeSlots;
+      return filterPastTimeSlots(date, new Set(fallbackSlots));
     }
   };
 
@@ -624,6 +647,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <p className="text-white">
                     {(() => {
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
+
+                      // Verificar si es el 24 de diciembre de 2025
+                      if (formData.date === "2025-12-24") {
+                        return "Horario especial Nochebuena: 7:00 AM - 5:00 PM (citas de 1 hora)";
+                      }
+
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
                       if (isSunday) {
@@ -631,7 +660,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       }
                       // Viernes usa horario estándar
                       return "Horarios disponibles (citas de 1 hora)";
-                    })()} 
+                    })()}
                   </p>
                 </div>
 
@@ -643,6 +672,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       {(() => {
                         // Determinar qué horarios mostrar según el día seleccionado
                         if (!formData.date) return timeSlots;
+
+                        // Verificar si es el 24 de diciembre de 2025 (Nochebuena)
+                        if (formData.date === "2025-12-24") {
+                          return christmasEveTimeSlots;
+                        }
+
                         const selectedDate = new Date(formData.date + "T00:00:00");
                         const isSunday = selectedDate.getDay() === 0;
                         // Viernes usa horario estándar
