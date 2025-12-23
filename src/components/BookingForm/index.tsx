@@ -723,8 +723,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 )}
                 {errors.time && <p className="mt-1 text-sm text-red-500">{errors.time.message}</p>}
 
-                {/* Navigation Buttons - En medio */}
-                <div className="flex justify-between pt-4 border-t border-gray-600/30">
+                {/* Navigation Buttons - Abajo de los horarios */}
+                <div className="flex justify-between pt-4">
                   <Button
                     type="button"
                     variant="outline"
