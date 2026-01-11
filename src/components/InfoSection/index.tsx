@@ -28,7 +28,7 @@ export const InfoSection = () => {
           <p className="text-center text-sm text-gray-300">⏰ Lunes a Jueves y Sábado: 10:00 AM - 8:00 PM</p>
           <p className="text-center text-sm text-gray-300">⏰ Martes: 10:00 AM - 8:00 PM</p>
           <p className="text-center text-sm text-gray-300">⏰ Viernes: 10:00 AM - 8:00 PM</p>
-          <p className="text-center text-sm text-gray-300">🔒 Domingo: 11:00 AM - 5:00 PM</p>
+          <p className="text-center text-sm text-gray-300">⏰ Domingo: 10:00 AM - 5:00 PM</p>
         </article>
 
         <article className="flex flex-col items-center gap-y-2">

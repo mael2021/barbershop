@@ -90,26 +90,23 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
 
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
-    
-    // Deshabilitar domingos
-    if (date.getDay() === 0) return true;
-    
+
     // Verificar fecha mínima si se proporciona
     if (minDate) {
       const minDateObj = new Date(minDate + "T00:00:00");
       const dateAtMidnight = new Date(date);
       dateAtMidnight.setHours(0, 0, 0, 0);
       minDateObj.setHours(0, 0, 0, 0);
-      
+
       if (dateAtMidnight < minDateObj) return true;
     }
-    
+
     // Deshabilitar fechas pasadas (pero NO hoy)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dateAtMidnight = new Date(date);
     dateAtMidnight.setHours(0, 0, 0, 0);
-    
+
     // Solo deshabilitar si es estrictamente menor que hoy (no igual)
     return dateAtMidnight < today;
   };
@@ -199,9 +196,7 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
                     // Día actual
                     isToday(date) && !isSameDay(date, selectedDate)
                       ? "bg-gradient-to-r from-neon-green/15 to-urban-purple/15 text-neon-green border-2 border-neon-green/40 shadow-lg"
-                      : "",
-                    // Domingos
-                    date.getDay() === 0 && "bg-red-900/10 text-red-400/50 border border-red-500/20"
+                      : ""
                   )}
                 >
                   {date.getDate()}
@@ -222,8 +217,8 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
         {/* Mensaje informativo más elegante */}
         <div className="mt-4 flex justify-center">
           <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-600/30">
-            <div className="w-2 h-2 bg-red-500 rounded-full opacity-70 animate-pulse"></div>
-            <span className="font-medium">Domingos cerrado</span>
+            <div className="w-2 h-2 bg-neon-green rounded-full opacity-70 animate-pulse"></div>
+            <span className="font-medium">Domingos abiertos: 10:00 AM - 5:00 PM</span>
           </div>
         </div>
       </div>
