@@ -223,11 +223,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
-    try {
-      // Determinar si es domingo para usar horarios especiales
-      const selectedDate = new Date(date + "T00:00:00");
-      const isSunday = selectedDate.getDay() === 0;
+    // Determinar si es domingo para usar horarios especiales
+    const selectedDate = new Date(date + "T00:00:00");
+    const isSunday = selectedDate.getDay() === 0;
 
+    try {
       const { data, error } = await supabase
         .from("reservations")
         .select("time, status")
