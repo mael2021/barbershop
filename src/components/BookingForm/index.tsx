@@ -232,6 +232,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         return new Set();
       }
 
+      // Fechas cerradas específicas
+      const closedDates = ["2026-04-03", "2026-04-04"];
+      if (closedDates.includes(date)) {
+        return new Set();
+      }
+
       const { data, error } = await supabase
         .from("reservations")
         .select("time, status")
