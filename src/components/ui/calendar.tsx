@@ -90,9 +90,16 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
 
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
-    
+
     // Deshabilitar domingos
     if (date.getDay() === 0) return true;
+
+    // Deshabilitar fechas cerradas específicas
+    const closedDates = ["2026-04-03", "2026-04-04"];
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    if (closedDates.includes(`${yyyy}-${mm}-${dd}`)) return true;
     
     // Verificar fecha mínima si se proporciona
     if (minDate) {
