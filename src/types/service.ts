@@ -14,5 +14,6 @@ export type Service = {
   description: string;
   duration: string;
   image?: string;
+  badge?: string;
   onBookNow?: () => void;
 } & (FixedPriceService | CustomPricedService);

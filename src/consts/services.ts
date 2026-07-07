@@ -1,5 +1,10 @@
 import type { Service } from "@/types";
 
+export const DESVANECIDO_LAVADO_AUTO = "Desvanecido + Lavado de Auto";
+
+// Color del evento en Google Calendar para el combo (6 = Mandarina/naranja)
+export const DESVANECIDO_LAVADO_AUTO_CALENDAR_COLOR_ID = "6";
+
 export const services: Service[] = [
   {
     name: "Desvanecido",
@@ -7,6 +12,14 @@ export const services: Service[] = [
     price: 100,
     duration: "1 hora",
     image: "/images/services/desvanecido.jpg",
+  },
+  {
+    name: DESVANECIDO_LAVADO_AUTO,
+    description: "Corte desvanecido profesional mientras lavamos tu auto. Sales con el look y el carro impecables.",
+    price: 230,
+    duration: "1 hora",
+    image: "/images/services/desvanecido-lavado-auto.jpg",
+    badge: "Nuevo",
   },
   {
     name: "Corte Normal",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Footer, Hero, ServiceSection, SupportiveCTA, BookingForm, InfoSection } from "@/components";
+import { AnnouncementBanner, Footer, Hero, ServiceSection, SupportiveCTA, BookingForm, InfoSection } from "@/components";
 
 export const HomePage = () => {
   const [isBookingOpen, setIsBookingOpen] = useState<boolean>(false);
@@ -22,6 +22,7 @@ export const HomePage = () => {
 
   return (
     <div className="bg-gradient-to-br from-graffiti-dark via-graffiti-gray to-black px-4">
+      <AnnouncementBanner onBookService={handleBookService} />
       <Hero onBookingClick={handleBookingClick} />
       <ServiceSection onBookService={handleBookService} />
       <SupportiveCTA />

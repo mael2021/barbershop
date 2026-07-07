@@ -1,4 +1,5 @@
 export * from "./AdminButton/index";
+export * from "./AnnouncementBanner/index";
 export * from "./BookingForm/index";
 export * from "./BookingSummary/index";
 export * from "./Footer/index";

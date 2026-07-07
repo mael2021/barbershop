@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock, User, Phone, X, ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
 import { supabase } from "@/supabase/client";
-import { services } from "@/consts/services";
+import { services, DESVANECIDO_LAVADO_AUTO, DESVANECIDO_LAVADO_AUTO_CALENDAR_COLOR_ID } from "@/consts/services";
 import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
+import { celebrateBooking } from "@/lib/confetti";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 // Eliminado: interfaz de eventos de Google ya no usada en disponibilidad local
@@ -372,6 +373,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       const event = {
         summary: `Cita: ${data.services.join(", ")}`,
         description: `Cliente: ${data.name}\nTeléfono: ${data.phone}`,
+        ...(data.services.includes(DESVANECIDO_LAVADO_AUTO) && {
+          colorId: DESVANECIDO_LAVADO_AUTO_CALENDAR_COLOR_ID,
+        }),
         start: {
           dateTime: startDateTime,
           timeZone: "America/Mexico_City",
@@ -425,6 +429,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
           description: "Tu reserva se guardó, pero no pudo aparecer en el calendario. Contacta al administrador.",
         });
       }
+
+      celebrateBooking();
 
       toast.success({
         text: "¡Reserva confirmada! 🔥",

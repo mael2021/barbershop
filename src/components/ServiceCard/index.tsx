@@ -1,12 +1,17 @@
 import type { Service } from "@/types/service";
 import { QuoteViaWhatsApp } from "@/components";
 
-export const ServiceCard = ({ name, description, duration, onBookNow, isCustomPriced, ...priceProps }: Service) => {
+export const ServiceCard = ({ name, description, duration, badge, onBookNow, isCustomPriced, ...priceProps }: Service) => {
   const price = "price" in priceProps ? priceProps.price : undefined;
   const customPrice = "customPrice" in priceProps ? priceProps.customPrice : undefined;
 
   return (
     <article className="spray-effect group relative flex transform flex-col gap-y-4 overflow-hidden rounded-lg border-gray-600 bg-graffiti-gray p-5 transition-all duration-300 hover:scale-105 hover:border-electric-blue">
+      {badge && (
+        <span className="absolute top-0 right-0 z-20 rounded-bl-lg bg-gradient-to-r from-spray-orange to-hot-pink px-3 py-1 text-xs font-bold tracking-wider text-white uppercase">
+          {badge}
+        </span>
+      )}
       <header>
         <h3 className="font-graffiti graffiti-shadow mb-2 text-3xl font-bold text-pretty text-white uppercase">
           {name}
