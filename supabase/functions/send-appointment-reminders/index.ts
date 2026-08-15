@@ -4,6 +4,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { isSendableEmail, reminderEmail, type Reservation } from "../_shared/emails.ts";
 import { sendEmail } from "../_shared/resend.ts";
 import { appointmentToUtc, todayInTimeZone } from "../_shared/datetime.ts";
+import { isSuppressed } from "../_shared/suppression.ts";
 
 // Cuánto antes de la cita se manda el recordatorio.
 const LEAD_MINUTES = Number(Deno.env.get("REMINDER_LEAD_MINUTES") ?? "120");
@@ -78,8 +79,13 @@ serve(async req => {
       }
 
       try {
-        const { subject, html } = reminderEmail(reservation);
-        await sendEmail({ to: reservation.email, subject, html });
+        if (await isSuppressed(supabase, reservation.email)) {
+          results.push({ id: reservation.id, sent: false, error: "dirección suprimida" });
+          continue;
+        }
+
+        const { subject, html, text } = reminderEmail(reservation);
+        await sendEmail({ to: reservation.email, subject, html, text });
         results.push({ id: reservation.id, sent: true });
       } catch (sendError) {
         // Se libera la marca para que el siguiente cron lo reintente.

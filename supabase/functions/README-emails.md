@@ -7,6 +7,7 @@ vivir en el frontend (todo lo que empieza con `VITE_` se empaqueta en el bundle 
 |---|---|---|
 | `send-confirmation-email` | Al crear la reserva | El cliente la invoca con el `reservationId` |
 | `send-appointment-reminders` | 2 h antes de la cita | `pg_cron` cada 15 min |
+| `resend-webhook` | Al rebotar o marcar spam | Resend (webhook firmado) |
 
 Remitente: `Master Cuts <no-reply@newbloom.com.mx>` (dominio ya verificado en Resend).
 
@@ -30,6 +31,29 @@ la rechaza explícitamente. Enviarle correo generaría hard bounces contra un do
 eso quema la reputación de envío de `newbloom.com.mx`. Si en el futuro aparece otro relleno,
 agregarlo a `PLACEHOLDER_EMAILS`.
 
+## Entregabilidad
+
+Medidas para que el dominio no pierda reputación:
+
+- **Lista de supresión.** `resend-webhook` recibe los eventos `email.bounced` (solo rebotes
+  permanentes: un buzón lleno es transitorio y no debe bloquear al cliente) y
+  `email.complained`, y guarda la dirección en `email_suppressions`. Ambas funciones de
+  envío consultan esa tabla antes de mandar. Seguir escribiendo a direcciones que rebotan
+  es lo que más rápido quema un dominio.
+- **Firma verificada.** El webhook valida la firma Svix (HMAC-SHA256 sobre
+  `<svix-id>.<svix-timestamp>.<body>`) y rechaza timestamps de más de 5 min para
+  cortar reenvíos. Va deployada con `--no-verify-jwt` porque Resend no manda JWT
+  de Supabase; la firma es la única autenticación, así que no puede faltar.
+- **Multipart texto + HTML.** El correo solo-HTML es patrón típico de spam.
+- **Detección de typos en el formulario** (`src/lib/emailTypos.ts`): `gmial.com`,
+  `hotmial.com`, `outlok.com`… se atajan antes de guardar y se sugiere la corrección.
+  La comparación es contra el dominio completo, para no marcar `yahoo.co.uk`.
+- **`Reply-To` real.** El dominio no tiene MX, así que responder a `no-reply@` le rebota
+  al cliente. Con `RESEND_REPLY_TO` las respuestas llegan a un buzón que sí se lee.
+
+Pendiente del lado DNS: el DMARC está en `v=DMARC1; p=none;` sin `rua`, o sea sin
+enforcement y sin reportes. Conviene agregar `rua=` y escalar a `p=quarantine` → `p=reject`.
+
 ## Puesta en marcha
 
 ### 1. Migración
@@ -52,8 +76,12 @@ Opcionales (tienen default):
 | Secret | Default | Para qué |
 |---|---|---|
 | `RESEND_FROM` | `Master Cuts <no-reply@newbloom.com.mx>` | Cambiar el remitente |
+| `RESEND_REPLY_TO` | *(sin definir)* | Buzón real al que llegan las respuestas |
 | `BARBERSHOP_TIMEZONE` | `America/Mexico_City` | Zona de la barbería (Panotla, Tlax.) |
 | `REMINDER_LEAD_MINUTES` | `120` | Cuánto antes se manda el recordatorio |
+
+Obligatorio para el webhook: `RESEND_WEBHOOK_SECRET` (lo da Resend al crear el webhook,
+empieza con `whsec_`).
 
 `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya los inyecta Supabase.
 

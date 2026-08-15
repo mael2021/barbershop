@@ -14,6 +14,7 @@ import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
 import { celebrateBooking } from "@/lib/confetti";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { suggestEmailFix } from "@/lib/emailTypos";
 
 // Eliminado: interfaz de eventos de Google ya no usada en disponibilidad local
 
@@ -41,7 +42,10 @@ const bookingFormSchema = z.object({
     .string()
     .min(1, "El correo electrónico es requerido")
     .email("Ingresa un correo electrónico válido")
-    .transform(val => val.trim().toLowerCase()),
+    .transform(val => val.trim().toLowerCase())
+    // Un dominio mal tecleado pasa la validación de formato y rebota al enviar.
+    // Se corta aquí y se le sugiere la corrección al cliente.
+    .refine(val => !suggestEmailFix(val), val => ({ message: `¿Quisiste decir ${suggestEmailFix(val)}?` })),
 });
 
 type BookingFormData = z.infer<typeof bookingFormSchema>;

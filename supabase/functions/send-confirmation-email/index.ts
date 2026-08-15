@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { confirmationEmail, isSendableEmail, type Reservation } from "../_shared/emails.ts";
 import { sendEmail } from "../_shared/resend.ts";
+import { isSuppressed } from "../_shared/suppression.ts";
 
 // Se invoca desde el cliente justo después de insertar la reserva.
 // El cliente solo manda el ID: el correo destino sale de la BD, nunca del request,
@@ -36,8 +37,13 @@ serve(async req => {
       return json({ skipped: "no_email" });
     }
 
-    const { subject, html } = confirmationEmail(reservation as Reservation);
-    const { id: messageId } = await sendEmail({ to: reservation.email, subject, html });
+    // Rebotó duro antes o marcó spam: no se le vuelve a escribir.
+    if (await isSuppressed(supabase, reservation.email)) {
+      return json({ skipped: "suppressed" });
+    }
+
+    const { subject, html, text } = confirmationEmail(reservation as Reservation);
+    const { id: messageId } = await sendEmail({ to: reservation.email, subject, html, text });
 
     // Se marca después de enviar: si Resend falla, queda pendiente y se puede reintentar.
     const { error: stampError } = await supabase
