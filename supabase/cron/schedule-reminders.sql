@@ -7,8 +7,10 @@
 --   <PROJECT_URL>       -> https://xxxxxxxxxxxx.supabase.co
 --   <SERVICE_ROLE_KEY>  -> Settings > API > service_role (secret)
 
-create extension if not exists pg_cron with schema extensions;
-create extension if not exists pg_net  with schema extensions;
+-- pg_cron crea y usa su propio esquema `cron`, así que va sin "with schema".
+-- pg_net sí vive en `extensions`.
+create extension if not exists pg_cron;
+create extension if not exists pg_net with schema extensions;
 
 -- Los secretos se guardan cifrados en Vault, no en la definición del cron.
 select vault.create_secret('<PROJECT_URL>',      'project_url');
