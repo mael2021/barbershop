@@ -37,6 +37,11 @@ const bookingFormSchema = z.object({
     .min(1, "El teléfono es requerido")
     .regex(/^[0-9]{10}$/, "Ingresa un número de teléfono válido (10 dígitos)")
     .transform(val => val.replace(/\D/g, "")),
+  email: z
+    .string()
+    .min(1, "El correo electrónico es requerido")
+    .email("Ingresa un correo electrónico válido")
+    .transform(val => val.trim().toLowerCase()),
 });
 
 type BookingFormData = z.infer<typeof bookingFormSchema>;
@@ -66,6 +71,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       time: "",
       name: "",
       phone: "",
+      email: "",
     },
   });
 
@@ -185,12 +191,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         isValid = Boolean(formData.time);
         break;
       case 4:
-        isValid = Boolean(formData.name && formData.phone);
+        isValid = Boolean(formData.name && formData.phone && formData.email);
         break;
     }
 
     setIsCurrentStepValid(isValid);
-  }, [currentStep, formData.services, formData.date, formData.time, formData.name, formData.phone]);
+  }, [currentStep, formData.services, formData.date, formData.time, formData.name, formData.phone, formData.email]);
 
   // Efecto para validar cuando cambia el paso o los datos
   useEffect(() => {
@@ -215,6 +221,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         time: "",
         name: "",
         phone: "",
+        email: "",
       });
       serviceSetRef.current = false;
       setCurrentStep(1);
@@ -298,7 +305,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         isValid = await trigger("time");
         break;
       case 4:
-        isValid = await trigger(["name", "phone"]);
+        isValid = await trigger(["name", "phone", "email"]);
         break;
     }
 
@@ -327,7 +334,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       }
 
       // Insert into Supabase
-      const { error: supabaseError } = await supabase
+      const { data: createdReservations, error: supabaseError } = await supabase
         .from("reservations")
         .insert([
           {
@@ -336,7 +343,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             time: data.time,
             customer_name: data.name,
             phone: data.phone,
-            email: "no-email@barberia.com", // Valor por defecto
+            email: data.email,
             status: "confirmed",
           },
         ])
@@ -348,6 +355,15 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
           description: "No se pudo crear tu reserva. Por favor, intenta nuevamente.",
         });
         return;
+      }
+
+      // Correo de confirmación (Resend). La reserva ya está guardada, así que un fallo
+      // aquí no debe romper el flujo: se registra y el recordatorio sigue su curso.
+      const reservationId = createdReservations?.[0]?.id;
+      if (reservationId) {
+        supabase.functions
+          .invoke("send-confirmation-email", { body: { reservationId } })
+          .catch(emailError => console.error("No se pudo enviar el correo de confirmación:", emailError));
       }
 
       // Crear evento en Google Calendar usando la función edge
@@ -757,6 +773,25 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     />
                     {errors.phone && touchedFields.phone && (
                       <p className="mt-1 text-sm text-red-500">{errors.phone.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="font-bold text-white uppercase">Correo electrónico</Label>
+                    <Input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      {...register("email", {
+                        onBlur: () => trigger("email"),
+                      })}
+                      placeholder="Ingresa tu correo"
+                      className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
+                        errors.email && touchedFields.email ? "border-red-500 focus-visible:ring-red-500" : ""
+                      }`}
+                    />
+                    {errors.email && touchedFields.email && (
+                      <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>
                     )}
                   </div>
                 </div>
