@@ -27,3 +27,6 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Supabase CLI (estado local: contiene la contraseña de la BD)
+supabase/.temp/
