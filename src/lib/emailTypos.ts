@@ -45,6 +45,13 @@ const POPULAR = [
   "aol.com",
 ];
 
+/**
+ * TLDs legítimos y frecuentes en México. Si el dominio termina en uno de estos, la
+ * capa 3b no aplica: `mibarberia.mx` es un dominio propio válido, no un `gmail.com`
+ * mal escrito, aunque la raíz se pareciera de casualidad.
+ */
+const VALID_TLDS = new Set(["com", "mx", "org", "net", "io", "es", "dev", "app", "co.uk"]);
+
 /** Typos frecuentes que quedan fuera del umbral de distancia o son ambiguos. */
 const EXPLICIT_TYPOS: Record<string, string> = {
   "gmail.con": "gmail.com",
@@ -61,29 +68,48 @@ const EXPLICIT_TYPOS: Record<string, string> = {
   "live.co": "live.com",
 };
 
-/** Distancia de Levenshtein con corte temprano: si supera `max`, devuelve max + 1. */
-const editDistance = (a: string, b: string, max: number): number => {
-  if (Math.abs(a.length - b.length) > max) return max + 1;
-
-  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+/**
+ * Distancia de Damerau-Levenshtein: cuenta la transposición de dos letras contiguas
+ * como UNA edición, no dos. Importa porque invertir letras ("gmial" por "gmail") es el
+ * error de tecleo más frecuente, y con Levenshtein simple costaba 2 y se escapaba.
+ */
+const editDistance = (a: string, b: string): number => {
+  const rows: number[][] = [Array.from({ length: b.length + 1 }, (_, j) => j)];
 
   for (let i = 1; i <= a.length; i++) {
-    const curr = [i];
-    let rowMin = i;
+    rows[i] = [i];
 
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
-      rowMin = Math.min(rowMin, curr[j]);
-    }
+      let best = Math.min(rows[i][j - 1] + 1, rows[i - 1][j] + 1, rows[i - 1][j - 1] + cost);
 
-    // Ninguna celda de la fila baja de `max`: el resultado final tampoco podrá.
-    if (rowMin > max) return max + 1;
-    prev = curr;
+      // Transposición: las dos letras están cruzadas respecto al candidato.
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        best = Math.min(best, rows[i - 2][j - 2] + 1);
+      }
+
+      rows[i][j] = best;
+    }
   }
 
-  return prev[b.length];
+  return rows[a.length][b.length];
 };
+
+/** Parte el dominio en raíz y TLD: "gmsl.co" -> { root: "gmsl", tld: "co" } */
+const splitDomain = (domain: string) => {
+  const lastDot = domain.lastIndexOf(".");
+  if (lastDot < 1) return null;
+
+  return { root: domain.slice(0, lastDot), tld: domain.slice(lastDot + 1) };
+};
+
+/**
+ * Umbral por longitud de raíz. Una raíz corta como "aol" (3 letras) con tolerancia 2
+ * marcaría casi cualquier cosa, así que las cortas exigen coincidencia mucho más
+ * estrecha. Es deliberadamente conservador: bloquear el correo de un cliente real es
+ * peor que dejar pasar un typo, porque el rebote lo atrapa después la lista de supresión.
+ */
+const rootThreshold = (root: string) => (root.length <= 4 ? 1 : 2);
 
 /** Devuelve el correo corregido si el dominio parece un typo, o `null`. */
 export const suggestEmailFix = (email: string): string | null => {
@@ -101,9 +127,27 @@ export const suggestEmailFix = (email: string): string | null => {
   if (explicit) return `${local}@${explicit}`;
 
   let best: { domain: string; distance: number } | null = null;
+
+  // Capa 3a: dominio completo parecido a un proveedor popular.
   for (const candidate of POPULAR) {
-    const distance = editDistance(domain, candidate, 2);
+    const distance = editDistance(domain, candidate);
     if (distance <= 2 && (!best || distance < best.distance)) {
+      best = { domain: candidate, distance };
+    }
+  }
+  if (best) return `${local}@${best.domain}`;
+
+  // Capa 3b: la raíz se parece a un proveedor pero el TLD también viene mal
+  // ("gmsl.co"). Comparar el dominio entero fallaba porque acumulaba los errores
+  // de la raíz y del TLD en una sola distancia.
+  const parts = splitDomain(domain);
+  if (!parts || VALID_TLDS.has(parts.tld)) return null;
+
+  for (const candidate of POPULAR) {
+    const candidateParts = splitDomain(candidate)!;
+    const distance = editDistance(parts.root, candidateParts.root);
+
+    if (distance <= rootThreshold(candidateParts.root) && (!best || distance < best.distance)) {
       best = { domain: candidate, distance };
     }
   }

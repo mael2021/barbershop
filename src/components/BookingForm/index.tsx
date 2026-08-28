@@ -15,6 +15,7 @@ import { BookingSummary } from "@/components";
 import { celebrateBooking } from "@/lib/confetti";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { suggestEmailFix } from "@/lib/emailTypos";
+import { CLOSED_DATES, getSpecialSchedule } from "@/consts/schedule";
 
 // Eliminado: interfaz de eventos de Google ya no usada en disponibilidad local
 
@@ -115,6 +116,15 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   ];
 
   // Viernes usa horario estándar (10:00 AM - 8:00 PM) => no se requiere arreglo especial
+
+  // Devuelve los horarios que aplican a una fecha concreta (YYYY-MM-DD)
+  const getSlotsForDate = (date: string): string[] => {
+    const specialSchedule = getSpecialSchedule(date);
+    if (specialSchedule) return specialSchedule.slots;
+
+    const selectedDate = new Date(date + "T00:00:00");
+    return selectedDate.getDay() === 0 ? sundayTimeSlots : timeSlots;
+  };
 
   const filterPastTimeSlots = (date: string, availableSlots: Set<string>): Set<string> => {
     const today = new Date();
@@ -235,20 +245,22 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   // Función para verificar disponibilidad consultando la base de datos (sin Google)
   const checkGoogleCalendarAvailability = async (date: string): Promise<Set<string>> => {
     try {
-      // Determinar si es domingo para marcar como cerrado
+      // Los días con horario especial abren aunque caigan en domingo
+      const specialSchedule = getSpecialSchedule(date);
       const selectedDate = new Date(date + "T00:00:00");
       const isSunday = selectedDate.getDay() === 0;
-      
-      // Si es domingo, devolver un conjunto vacío (sin horarios disponibles)
-      if (isSunday) {
+
+      // Si es domingo sin horario especial, devolver un conjunto vacío (sin horarios disponibles)
+      if (isSunday && !specialSchedule) {
         return new Set();
       }
 
       // Fechas cerradas específicas
-      const closedDates = ["2026-04-03", "2026-04-04"];
-      if (closedDates.includes(date)) {
+      if (CLOSED_DATES.includes(date)) {
         return new Set();
       }
+
+      const daySlots = getSlotsForDate(date);
 
       const { data, error } = await supabase
         .from("reservations")
@@ -258,18 +270,18 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
       if (error) {
         console.error("Error al consultar reservas:", error);
-        // Usar horario estándar para días no domingo
-        return filterPastTimeSlots(date, new Set(timeSlots));
+        // Usar el horario del día como respaldo
+        return filterPastTimeSlots(date, new Set(daySlots));
       }
 
       const reservedTimes = new Set<string>((data || []).map((r: { time: string }) => r.time));
-      const available = new Set<string>(timeSlots.filter((t) => !reservedTimes.has(t)));
+      const available = new Set<string>(daySlots.filter((t) => !reservedTimes.has(t)));
 
       return filterPastTimeSlots(date, available);
     } catch (err) {
       console.error("Error al consultar disponibilidad en BD:", err);
-      // Usar horario estándar para días no domingo
-      return filterPastTimeSlots(date, new Set(timeSlots));
+      // Usar el horario del día como respaldo
+      return filterPastTimeSlots(date, new Set(getSlotsForDate(date)));
     }
   };
 
@@ -656,6 +668,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <p className="text-white">
                     {(() => {
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
+                      const specialSchedule = getSpecialSchedule(formData.date);
+                      if (specialSchedule) {
+                        return `Horario especial: ${specialSchedule.hours} (citas de 1 hora)`;
+                      }
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
                       if (isSunday) {
@@ -675,10 +691,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       {(() => {
                         // Determinar qué horarios mostrar según el día seleccionado
                         if (!formData.date) return timeSlots;
-                        const selectedDate = new Date(formData.date + "T00:00:00");
-                        const isSunday = selectedDate.getDay() === 0;
-                        // Viernes usa horario estándar
-                        return isSunday ? sundayTimeSlots : timeSlots;
+                        return getSlotsForDate(formData.date);
                       })().map(time => {
                         const isAvailable = availableSlots.has(time);
                         return (
@@ -708,9 +721,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       if (!formData.date) return null;
                       const selectedDate = new Date(formData.date + "T00:00:00");
                       const isSunday = selectedDate.getDay() === 0;
-                      
-                      // Solo mostrar el botón de WhatsApp en días normales (no domingos)
-                      if (isSunday) return null;
+
+                      // Solo mostrar el botón de WhatsApp en días normales
+                      // (no domingos ni días con horario especial)
+                      if (isSunday || getSpecialSchedule(formData.date)) return null;
                       
                       return (
                         <div className="mt-6 pt-4 border-t border-gray-600/30">

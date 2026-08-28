@@ -1,4 +1,8 @@
+import { formatSpecialDate, getUpcomingSpecialSchedules } from "@/consts/schedule";
+
 export const InfoSection = () => {
+  const specialSchedules = getUpcomingSpecialSchedules();
+
   return (
     <section className="mx-auto max-w-5xl">
       <h2 className="graffiti-shadow mb-10 text-center font-anton text-4xl font-bold tracking-wide text-white uppercase">
@@ -29,6 +33,11 @@ export const InfoSection = () => {
           <p className="text-center text-sm text-gray-300">⏰ Martes: 10:00 AM - 8:00 PM</p>
           <p className="text-center text-sm text-gray-300">⏰ Viernes: 10:00 AM - 8:00 PM</p>
           <p className="text-center text-sm text-gray-300">🔒 Domingo: 11:00 AM - 5:00 PM</p>
+          {specialSchedules.map(([date, schedule]) => (
+            <p key={date} className="text-center text-sm font-semibold text-neon-green">
+              ⚡ {formatSpecialDate(date)}: {schedule.hours}
+            </p>
+          ))}
         </article>
 
         <article className="flex flex-col items-center gap-y-2">

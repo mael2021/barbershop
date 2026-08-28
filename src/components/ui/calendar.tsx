@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { CLOSED_DATES, SPECIAL_SCHEDULES, toDateKey } from "@/consts/schedule";
 
 interface CalendarProps {
   value?: string;
@@ -91,15 +92,14 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
   const isDateDisabled = (date: Date) => {
     if (!date) return true;
 
-    // Deshabilitar domingos
-    if (date.getDay() === 0) return true;
+    const dateKey = toDateKey(date);
+    const hasSpecialSchedule = Boolean(SPECIAL_SCHEDULES[dateKey]);
+
+    // Deshabilitar domingos, salvo los que tienen horario especial
+    if (date.getDay() === 0 && !hasSpecialSchedule) return true;
 
     // Deshabilitar fechas cerradas específicas
-    const closedDates = ["2026-04-03", "2026-04-04"];
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    if (closedDates.includes(`${yyyy}-${mm}-${dd}`)) return true;
+    if (CLOSED_DATES.includes(dateKey)) return true;
     
     // Verificar fecha mínima si se proporciona
     if (minDate) {
@@ -207,8 +207,10 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
                     isToday(date) && !isSameDay(date, selectedDate)
                       ? "bg-gradient-to-r from-neon-green/15 to-urban-purple/15 text-neon-green border-2 border-neon-green/40 shadow-lg"
                       : "",
-                    // Domingos
-                    date.getDay() === 0 && "bg-red-900/10 text-red-400/50 border border-red-500/20"
+                    // Domingos cerrados
+                    date.getDay() === 0 &&
+                      isDateDisabled(date) &&
+                      "bg-red-900/10 text-red-400/50 border border-red-500/20"
                   )}
                 >
                   {date.getDate()}
