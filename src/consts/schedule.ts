@@ -26,11 +26,36 @@ const EXTENDED_MORNING_SCHEDULE: SpecialSchedule = {
   slots: EXTENDED_MORNING_SLOTS,
 };
 
+// Horario especial con apertura temprana de 7:00 AM a 8:00 PM (citas de 1 hora)
+const EARLY_OPENING_SLOTS = [
+  "7:00 AM",
+  "8:00 AM",
+  "9:00 AM",
+  "10:00 AM",
+  "11:00 AM",
+  "12:00 PM",
+  "1:00 PM",
+  "2:00 PM",
+  "3:00 PM",
+  "4:00 PM",
+  "5:00 PM",
+  "6:00 PM",
+  "7:00 PM",
+  "8:00 PM",
+];
+
+const EARLY_OPENING_SCHEDULE: SpecialSchedule = {
+  hours: "7:00 AM - 8:00 PM",
+  slots: EARLY_OPENING_SLOTS,
+};
+
 // Días con horario distinto al habitual. Sobrescriben el horario del día de la
 // semana (incluidos los domingos, que normalmente están cerrados).
 export const SPECIAL_SCHEDULES: Record<string, SpecialSchedule> = {
   "2026-08-29": EXTENDED_MORNING_SCHEDULE,
   "2026-08-30": EXTENDED_MORNING_SCHEDULE,
+  "2026-09-22": EARLY_OPENING_SCHEDULE,
+  "2026-09-23": EARLY_OPENING_SCHEDULE,
 };
 
 // Convierte un Date a la clave YYYY-MM-DD usada en las constantes de arriba
