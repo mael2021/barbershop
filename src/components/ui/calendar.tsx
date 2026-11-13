@@ -207,8 +207,8 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
                     isToday(date) && !isSameDay(date, selectedDate)
                       ? "bg-gradient-to-r from-neon-green/15 to-urban-purple/15 text-neon-green border-2 border-neon-green/40 shadow-lg"
                       : "",
-                    // Domingos cerrados
-                    date.getDay() === 0 &&
+                    // Domingos cerrados y fechas cerradas
+                    (date.getDay() === 0 || CLOSED_DATES.includes(toDateKey(date))) &&
                       isDateDisabled(date) &&
                       "bg-red-900/10 text-red-400/50 border border-red-500/20"
                   )}

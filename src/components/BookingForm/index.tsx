@@ -15,7 +15,12 @@ import { BookingSummary } from "@/components";
 import { celebrateBooking } from "@/lib/confetti";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { suggestEmailFix } from "@/lib/emailTypos";
-import { CLOSED_DATES, getSpecialSchedule } from "@/consts/schedule";
+import {
+  CLOSED_DATES,
+  formatClosedDatesGroup,
+  getSpecialSchedule,
+  getUpcomingClosedDateGroups,
+} from "@/consts/schedule";
 
 // Eliminado: interfaz de eventos de Google ya no usada en disponibilidad local
 
@@ -28,7 +33,12 @@ interface BookingFormProps {
 
 const bookingFormSchema = z.object({
   services: z.array(z.string()).min(1, "Debes seleccionar al menos un servicio"),
-  date: z.string().min(1, "La fecha es requerida"),
+  date: z
+    .string()
+    .min(1, "La fecha es requerida")
+    .refine(val => !CLOSED_DATES.includes(val), {
+      message: "La barbería permanecerá cerrada en esta fecha. Por favor selecciona otro día.",
+    }),
   time: z.string().min(1, "La hora es requerida"),
   name: z
     .string()
@@ -629,6 +639,17 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 </div>
 
                 <div className="space-y-4">
+                  {getUpcomingClosedDateGroups().map((group) => (
+                    <div
+                      key={group[0]}
+                      role="status"
+                      className="rounded-lg border border-red-500/30 bg-red-950/40 p-3 text-center text-xs text-red-200 sm:text-sm"
+                    >
+                      <span className="font-bold text-red-400 uppercase">Aviso:</span> Los días{" "}
+                      <span className="font-semibold text-white">{formatClosedDatesGroup(group)}</span> estaremos cerrados.
+                    </div>
+                  ))}
+
                   {/* Calendario para escritorio */}
                   <div className="hidden md:block">
                     <CalendarComponent
@@ -723,8 +744,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       const isSunday = selectedDate.getDay() === 0;
 
                       // Solo mostrar el botón de WhatsApp en días normales
-                      // (no domingos ni días con horario especial)
-                      if (isSunday || getSpecialSchedule(formData.date)) return null;
+                      // (no domingos, días cerrados ni días con horario especial)
+                      if (isSunday || getSpecialSchedule(formData.date) || CLOSED_DATES.includes(formData.date)) return null;
                       
                       return (
                         <div className="mt-6 pt-4 border-t border-gray-600/30">

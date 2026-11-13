@@ -1,7 +1,13 @@
-import { formatSpecialDate, getUpcomingSpecialSchedules } from "@/consts/schedule";
+import {
+  formatClosedDatesGroup,
+  formatSpecialDate,
+  getUpcomingClosedDateGroups,
+  getUpcomingSpecialSchedules,
+} from "@/consts/schedule";
 
 export const InfoSection = () => {
   const specialSchedules = getUpcomingSpecialSchedules();
+  const closedGroups = getUpcomingClosedDateGroups();
 
   return (
     <section className="mx-auto max-w-5xl">
@@ -36,6 +42,11 @@ export const InfoSection = () => {
           {specialSchedules.map(([date, schedule]) => (
             <p key={date} className="text-center text-sm font-semibold text-neon-green">
               ⚡ {formatSpecialDate(date)}: {schedule.hours}
+            </p>
+          ))}
+          {closedGroups.map((group) => (
+            <p key={group[0]} className="text-center text-sm font-semibold text-red-400">
+              🚫 Cerrado: {formatClosedDatesGroup(group)}
             </p>
           ))}
         </article>
