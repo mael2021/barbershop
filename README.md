@@ -91,6 +91,7 @@ supabase functions deploy booking-contact
 
 ### Acceso al panel de administración
 
+Desde la raíz del proyecto, inicia sesión con `supabase login` con una cuenta que tenga acceso al proyecto vinculado.
 Genera un código nuevo con `openssl rand -hex 24` y guárdalo para entrar a `/admin`.
 Pégalo al ejecutar `read`. Supabase verifica este código antes de autorizar la eliminación de reservas.
 
@@ -98,7 +99,7 @@ Pégalo al ejecutar `read`. Supabase verifica este código antes de autorizar la
 read -rs adminAccessCode
 supabase secrets set "ADMIN_ACCESS_CODE=$adminAccessCode"
 unset adminAccessCode
-supabase functions deploy admin-reservations
+supabase functions deploy admin-reservations --use-api
 ```
 
 Publica el frontend después de desplegar la función. Si marcas «Recordar mi sesión», el navegador guarda la sesión hasta 12 horas.

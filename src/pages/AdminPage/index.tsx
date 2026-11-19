@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { FunctionsHttpError } from "@supabase/supabase-js";
+import { FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +44,15 @@ const clearStoredAdminSession = () => {
   }
 };
 
-const adminResponseStatus = (error: unknown) => error instanceof FunctionsHttpError ? error.context.status : undefined;
+const adminResponseStatus = (error: unknown) =>
+  error instanceof FunctionsHttpError || error instanceof FunctionsRelayError ? error.context.status : undefined;
+
+const adminAccessError = (status: number | undefined, unauthorizedMessage: string) => {
+  if (status === 401) return unauthorizedMessage;
+  if (status === 404) return 'La función admin-reservations aún no está desplegada en Supabase.';
+  if (status === 503) return 'Falta configurar ADMIN_ACCESS_CODE en Supabase.';
+  return 'No se pudo verificar el acceso. Inténtalo de nuevo.';
+};
 
 export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -85,9 +93,10 @@ export const AdminPage = () => {
       if (ignore) return;
       if (data?.authenticated) {
         setAdminSession(token);
-      } else if (adminResponseStatus(error) === 401) {
-        clearStoredAdminSession();
-        setCodeError('Tu sesión venció. Ingresa el código de acceso.');
+      } else {
+        const status = adminResponseStatus(error);
+        if (status === 401) clearStoredAdminSession();
+        setCodeError(adminAccessError(status, 'Tu sesión venció. Ingresa el código de acceso.'));
       }
       setIsCheckingAccess(false);
     });
@@ -320,10 +329,7 @@ export const AdminPage = () => {
         body: { action: 'login', accessCode: accessCode.trim() },
       });
       if (error || !data?.token) {
-        const status = adminResponseStatus(error);
-        if (status === 401) setCodeError('Código incorrecto. Inténtalo nuevamente.');
-        else if (status === 503) setCodeError('El acceso de administración todavía no está configurado.');
-        else setCodeError('No se pudo verificar el acceso. Inténtalo de nuevo.');
+        setCodeError(adminAccessError(adminResponseStatus(error), 'Código incorrecto. Inténtalo nuevamente.'));
         return;
       }
 
