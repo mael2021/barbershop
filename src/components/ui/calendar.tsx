@@ -138,15 +138,16 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
   return (
     <div className="flex justify-center items-center w-full py-4">
       <div className={cn(
-        "bg-gradient-to-br from-graffiti-dark/90 to-graffiti-dark/95 backdrop-blur-md border border-gray-600/40 rounded-2xl p-4 max-w-sm w-full shadow-2xl ring-1 ring-white/5",
+        "bg-gradient-to-br from-graffiti-dark/90 to-graffiti-dark/95 backdrop-blur-md border border-gray-600/40 rounded-2xl p-2 sm:p-4 max-w-sm w-full shadow-2xl ring-1 ring-white/5",
         className
       )}>
         {/* Header del calendario */}
         <div className="flex items-center justify-between mb-4 px-2">
           <button
             type="button"
+            aria-label="Mes anterior"
             onClick={goToPreviousMonth}
-            className="p-2 hover:bg-gray-700/40 rounded-xl transition-all duration-300 hover:scale-110 group"
+            className="group flex size-10 items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 hover:bg-gray-700/40 sm:size-8"
           >
             <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-white transition-colors" />
           </button>
@@ -162,15 +163,16 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
           
           <button
             type="button"
+            aria-label="Mes siguiente"
             onClick={goToNextMonth}
-            className="p-2 hover:bg-gray-700/40 rounded-xl transition-all duration-300 hover:scale-110 group"
+            className="group flex size-10 items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 hover:bg-gray-700/40 sm:size-8"
           >
             <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-white transition-colors" />
           </button>
         </div>
 
         {/* Días de la semana */}
-        <div className="grid grid-cols-7 gap-1 mb-3 px-1">
+        <div className="mb-3 grid grid-cols-7 gap-1 sm:px-1">
           {dayNames.map((day, index) => (
             <div
               key={day}
@@ -185,12 +187,13 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
         </div>
 
         {/* Días del mes */}
-        <div className="grid grid-cols-7 gap-1 px-1">
+        <div className="grid grid-cols-7 gap-1 sm:px-1">
           {getDaysInMonth(currentMonth).map((date, index) => (
-            <div key={index} className="aspect-square flex items-center justify-center">
+            <div key={index} className="flex aspect-square min-h-10 items-center justify-center sm:min-h-0">
               {date && (
                 <button
                   type="button"
+                  aria-pressed={isSameDay(date, selectedDate)}
                   onClick={() => handleDateClick(date)}
                   disabled={isDateDisabled(date)}
                   className={cn(

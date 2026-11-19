@@ -83,6 +83,26 @@ O manualmente:
 supabase functions deploy store-google-token
 ```
 
+Para habilitar el autocompletado de contactos guardados en el navegador, despliega también `booking-contact`.
+
+```bash
+supabase functions deploy booking-contact
+```
+
+### Acceso al panel de administración
+
+Genera un código nuevo con `openssl rand -hex 24` y guárdalo para entrar a `/admin`.
+Pégalo al ejecutar `read`. Supabase verifica este código antes de autorizar la eliminación de reservas.
+
+```bash
+read -rs adminAccessCode
+supabase secrets set "ADMIN_ACCESS_CODE=$adminAccessCode"
+unset adminAccessCode
+supabase functions deploy admin-reservations
+```
+
+Publica el frontend después de desplegar la función. Si marcas «Recordar mi sesión», el navegador guarda la sesión hasta 12 horas.
+
 ## 🔄 Renovación Automática de Tokens
 
 El sistema incluye renovación automática de tokens de Google:
@@ -140,10 +160,10 @@ npm run build
 
 ### Para Clientes:
 
-1. Selecciona servicios
-2. Elige fecha y horario disponible
-3. Completa información de contacto
-4. Confirma reserva
+1. Consulta los precios y selecciona tus servicios.
+2. Elige la fecha y un horario disponible.
+3. Completa tus datos. Si elegiste recordarlos, el correo, el nombre y el teléfono se rellenan al llegar a este paso en el mismo navegador.
+4. Confirma la reserva.
 
 ## 🔐 Seguridad
 

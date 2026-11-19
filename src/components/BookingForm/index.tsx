@@ -1,26 +1,26 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, User, Phone, X, ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
+import { Calendar, Clock, User, X, ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
 import { supabase } from "@/supabase/client";
 import { services, DESVANECIDO_LAVADO_AUTO, DESVANECIDO_LAVADO_AUTO_CALENDAR_COLOR_ID } from "@/consts/services";
 import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
 import { celebrateBooking } from "@/lib/confetti";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { suggestEmailFix } from "@/lib/emailTypos";
 import {
   CLOSED_DATES,
   formatClosedDatesGroup,
   getSpecialSchedule,
   getUpcomingClosedDateGroups,
+  toDateKey,
 } from "@/consts/schedule";
+import { ContactFields } from "./ContactFields";
+import { forgetBookingContact, rememberBookingContact } from "./rememberedContact";
+import { bookingFormSchema, type BookingFormData } from "./schema";
 
 // Eliminado: interfaz de eventos de Google ya no usada en disponibilidad local
 
@@ -31,53 +31,14 @@ interface BookingFormProps {
   excludedServices?: string[];
 }
 
-const bookingFormSchema = z.object({
-  services: z.array(z.string()).min(1, "Debes seleccionar al menos un servicio"),
-  date: z
-    .string()
-    .min(1, "La fecha es requerida")
-    .refine(val => !CLOSED_DATES.includes(val), {
-      message: "La barbería permanecerá cerrada en esta fecha. Por favor selecciona otro día.",
-    }),
-  time: z.string().min(1, "La hora es requerida"),
-  name: z
-    .string()
-    .min(1, "El nombre es requerido")
-    .regex(/^[a-zA-ZÀ-ÿ\s]{2,}$/, "El nombre solo debe contener letras y espacios"),
-  phone: z
-    .string()
-    .min(1, "El teléfono es requerido")
-    .regex(/^[0-9]{10}$/, "Ingresa un número de teléfono válido (10 dígitos)")
-    .transform(val => val.replace(/\D/g, "")),
-  email: z
-    .string()
-    .min(1, "El correo electrónico es requerido")
-    .email("Ingresa un correo electrónico válido")
-    .transform(val => val.trim().toLowerCase())
-    // Un dominio mal tecleado pasa la validación de formato y rebota al enviar.
-    // Se corta aquí y se le sugiere la corrección al cliente.
-    .refine(val => !suggestEmailFix(val), val => ({ message: `¿Quisiste decir ${suggestEmailFix(val)}?` })),
-});
-
-type BookingFormData = z.infer<typeof bookingFormSchema>;
+const stepFields: Exclude<keyof BookingFormData, "rememberContact">[][] = [["services"], ["date"], ["time"], ["email", "name", "phone"]];
 
 export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServices = [] }: BookingFormProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-  const [isCurrentStepValid, setIsCurrentStepValid] = useState(false);
-  const serviceSetRef = useRef(false);
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors, touchedFields },
-    trigger,
-    reset,
-  } = useForm<BookingFormData>({
+  const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingFormSchema),
     mode: "onTouched",
     defaultValues: {
@@ -87,19 +48,14 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       name: "",
       phone: "",
       email: "",
+      rememberContact: false,
     },
   });
 
+  const { handleSubmit, setValue, watch, formState: { errors }, trigger, reset } = form;
   const formData = watch();
-
-  // Función para obtener la fecha mínima formateada
-  const getTodayDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  const currentFields = stepFields[currentStep - 1];
+  const isCurrentStepValid = currentFields.every(field => formData[field].length > 0);
 
   const timeSlots = [
     "10:00 AM",
@@ -200,41 +156,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
     }, 0);
   };
 
-  // Memoize validateCurrentStep to avoid infinite loops
-  const validateCurrentStep = useCallback(async () => {
-    let isValid = false;
-
-    switch (currentStep) {
-      case 1:
-        isValid = Boolean(formData.services && formData.services.length > 0);
-        break;
-      case 2:
-        isValid = Boolean(formData.date);
-        break;
-      case 3:
-        isValid = Boolean(formData.time);
-        break;
-      case 4:
-        isValid = Boolean(formData.name && formData.phone && formData.email);
-        break;
-    }
-
-    setIsCurrentStepValid(isValid);
-  }, [currentStep, formData.services, formData.date, formData.time, formData.name, formData.phone, formData.email]);
-
-  // Efecto para validar cuando cambia el paso o los datos
-  useEffect(() => {
-    validateCurrentStep();
-  }, [validateCurrentStep]);
-
   // Efecto para manejar el servicio preseleccionado
   useEffect(() => {
-    if (isOpen && preSelectedService && !serviceSetRef.current) {
+    if (isOpen && preSelectedService) {
       setValue("services", [preSelectedService], { shouldValidate: true });
-      serviceSetRef.current = true;
-      validateCurrentStep();
     }
-  }, [preSelectedService, isOpen, setValue, validateCurrentStep]);
+  }, [preSelectedService, isOpen, setValue]);
 
   // Efecto para resetear el formulario cuando se cierra
   useEffect(() => {
@@ -246,8 +173,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
         name: "",
         phone: "",
         email: "",
+        rememberContact: false,
       });
-      serviceSetRef.current = false;
       setCurrentStep(1);
     }
   }, [isOpen, reset, setCurrentStep]);
@@ -318,26 +245,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   }, [formData.date]);
 
   const nextStep = async () => {
-    let isValid = false;
-
-    switch (currentStep) {
-      case 1:
-        isValid = await trigger("services");
-        break;
-      case 2:
-        isValid = await trigger("date");
-        break;
-      case 3:
-        isValid = await trigger("time");
-        break;
-      case 4:
-        isValid = await trigger(["name", "phone", "email"]);
-        break;
-    }
-
-    if (isValid && currentStep < 4) {
-      setCurrentStep(currentStep + 1);
-    }
+    if (currentStep < stepFields.length && await trigger(currentFields)) setCurrentStep(currentStep + 1);
   };
 
   const prevStep = () => {
@@ -373,7 +281,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             status: "confirmed",
           },
         ])
-        .select();
+        .select("id");
 
       if (supabaseError) {
         toast.error({
@@ -386,6 +294,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
       // Correo de confirmación (Resend). La reserva ya está guardada, así que un fallo
       // aquí no debe romper el flujo: se registra y el recordatorio sigue su curso.
       const reservationId = createdReservations?.[0]?.id;
+      if (data.rememberContact && reservationId) {
+        void rememberBookingContact(data.email, data.phone, reservationId);
+      } else if (!data.rememberContact) {
+        forgetBookingContact(data.email);
+      }
+
       if (reservationId) {
         supabase.functions
           .invoke("send-confirmation-email", { body: { reservationId } })
@@ -506,11 +420,20 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
       <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border-gray-600 bg-graffiti-gray">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form noValidate onSubmit={event => {
+          event.preventDefault();
+          if (currentStep < stepFields.length) {
+            void nextStep();
+          } else if (!isSubmitting) {
+            void handleSubmit(onSubmit)(event);
+          }
+        }}>
           <CardHeader className="relative border-b border-gray-600 p-6">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
+              aria-label="Cerrar formulario"
               onClick={onClose}
               className="absolute top-4 right-4 cursor-pointer text-gray-400 hover:text-white"
             >
@@ -519,19 +442,19 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
             <CardTitle className="text-center text-3xl text-white uppercase">Reserva tu cita</CardTitle>
             <CardDescription className="text-center text-white">
-              Paso {currentStep} de 4 - ¡Vamos a que te veas genial!
+              Paso {currentStep} de {stepFields.length} - ¡Vamos a que te veas genial!
             </CardDescription>
 
             {/* Progress Bar */}
             <div className="mt-4 h-2 w-full rounded-full bg-gray-700">
               <div
                 className="h-2 rounded-full bg-gradient-to-r from-spray-orange to-electric-blue transition-all duration-300"
-                style={{ width: `${(currentStep / 4) * 100}%` }}
+                style={{ width: `${(currentStep / stepFields.length) * 100}%` }}
               ></div>
             </div>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className={currentStep === 2 ? "px-3 sm:px-6" : undefined}>
             {/* Step 1: Service Selection */}
             {currentStep === 1 && (
               <div className="animate-fade-in space-y-6">
@@ -650,29 +573,12 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     </div>
                   ))}
 
-                  {/* Calendario para escritorio */}
-                  <div className="hidden md:block">
-                    <CalendarComponent
-                      value={formData.date}
-                      onChange={(date) => setValue("date", date, { shouldValidate: true })}
-                      minDate={new Date().toISOString().split("T")[0]}
-                    />
-                  </div>
+                  <CalendarComponent
+                    value={formData.date}
+                    onChange={(date) => setValue("date", date, { shouldValidate: true })}
+                    minDate={toDateKey(new Date())}
+                  />
 
-                  {/* Input de fecha para móvil */}
-                  <div className="md:hidden">
-                    <Label className="font-bold text-white uppercase">Fecha</Label>
-                    <Input
-                      type="date"
-                      {...register("date")}
-                      className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
-                        errors.date ? "border-red-500 focus-visible:ring-red-500" : ""
-                      }`}
-                      min={getTodayDate()}
-
-                    />
-                  </div>
-                  
                   {errors.date && <p className="mt-1 text-sm text-red-500">{errors.date.message}</p>}
                 </div>
               </div>
@@ -769,76 +675,14 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
               </div>
             )}
 
-            {/* Step 4: Contact Information */}
-            {currentStep === 4 && (
-              <div className="animate-fade-in space-y-6">
-                <div className="text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-urban-purple to-neon-green">
-                    <Phone className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="mb-2 text-2xl font-bold text-white uppercase">Tus datos</h3>
-                  <p className="text-balance text-white">
-                    Solo necesitamos algunos datos de contacto para confirmar tu cita
-                  </p>
+            <div hidden={currentStep !== 4}>
+              <ContactFields form={form} isActive={currentStep === 4} />
+              {currentStep === 4 && (
+                <div className="mt-6">
+                  <BookingSummary services={formData.services} date={formData.date} time={formData.time} />
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <Label className="font-bold text-white uppercase">Nombre completo</Label>
-                    <Input
-                      {...register("name", {
-                        onBlur: () => trigger("name"),
-                      })}
-                      placeholder="Ingresa tu nombre"
-                      className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
-                        errors.name && touchedFields.name ? "border-red-500 focus-visible:ring-red-500" : ""
-                      }`}
-                    />
-                    {errors.name && touchedFields.name && (
-                      <p className="mt-1 text-sm text-red-500">{errors.name.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="font-bold text-white uppercase">Teléfono</Label>
-                    <Input
-                      {...register("phone", {
-                        onBlur: () => trigger("phone"),
-                      })}
-                      placeholder="Ingresa tu teléfono"
-                      className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
-                        errors.phone && touchedFields.phone ? "border-red-500 focus-visible:ring-red-500" : ""
-                      }`}
-                    />
-                    {errors.phone && touchedFields.phone && (
-                      <p className="mt-1 text-sm text-red-500">{errors.phone.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="font-bold text-white uppercase">Correo electrónico</Label>
-                    <Input
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      {...register("email", {
-                        onBlur: () => trigger("email"),
-                      })}
-                      placeholder="Ingresa tu correo"
-                      className={`border-gray-600 bg-graffiti-dark text-white placeholder-gray-400 ${
-                        errors.email && touchedFields.email ? "border-red-500 focus-visible:ring-red-500" : ""
-                      }`}
-                    />
-                    {errors.email && touchedFields.email && (
-                      <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Booking Summary */}
-                <BookingSummary services={formData.services} date={formData.date} time={formData.time} />
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Navigation Buttons */}
             <div className="mt-8 flex justify-between">
@@ -853,8 +697,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 Atrás
               </Button>
 
-              {currentStep < 4 ? (
+              {currentStep < stepFields.length ? (
                 <Button
+                  key="next-step"
                   type="button"
                   onClick={nextStep}
                   disabled={!isCurrentStepValid}
@@ -867,6 +712,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 </Button>
               ) : (
                 <Button
+                  key="confirm-booking"
                   type="submit"
                   disabled={!isCurrentStepValid || isSubmitting}
                   className={`bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 ${

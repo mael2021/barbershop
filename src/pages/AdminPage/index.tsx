@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,10 +33,25 @@ interface DbReservation {
   status?: string;
 }
 
+const adminSessionKey = "master-cuts:admin-session";
+
+const clearStoredAdminSession = () => {
+  try {
+    localStorage.removeItem(adminSessionKey);
+    sessionStorage.removeItem(adminSessionKey);
+  } catch {
+    // El panel también puede usar una sesión en memoria.
+  }
+};
+
+const adminResponseStatus = (error: unknown) => error instanceof FunctionsHttpError ? error.context.status : undefined;
+
 export const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLinked, setIsLinked] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminSession, setAdminSession] = useState<string | null>(null);
+  const isAuthenticated = Boolean(adminSession);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [codeError, setCodeError] = useState("");
   const [rememberCode, setRememberCode] = useState(false);
@@ -52,15 +68,31 @@ export const AdminPage = () => {
   const hasAutoSyncedRef = useRef(false);
 
   useEffect(() => {
-    // Verificar si hay un código de acceso guardado
-    const storedCode = localStorage.getItem('adminAccessCode');
-    if (storedCode === "cris2025F") {
-      setIsAuthenticated(true);
-      toast.success({
-        text: "Acceso automático",
-        description: "Bienvenido de nuevo al panel de administración.",
-      });
+    let token: string | null;
+    try {
+      localStorage.removeItem('adminAccessCode');
+      token = localStorage.getItem(adminSessionKey) ?? sessionStorage.getItem(adminSessionKey);
+    } catch {
+      return;
     }
+    if (!token) return;
+
+    let ignore = false;
+    setIsCheckingAccess(true);
+    void supabase.functions.invoke<{ authenticated: boolean }>('admin-reservations', {
+      body: { action: 'session', token },
+    }).then(({ data, error }) => {
+      if (ignore) return;
+      if (data?.authenticated) {
+        setAdminSession(token);
+      } else if (adminResponseStatus(error) === 401) {
+        clearStoredAdminSession();
+        setCodeError('Tu sesión venció. Ingresa el código de acceso.');
+      }
+      setIsCheckingAccess(false);
+    });
+
+    return () => { ignore = true; };
   }, []);
 
   useEffect(() => {
@@ -277,33 +309,42 @@ export const AdminPage = () => {
     }
   };
 
-  // Función para verificar el código de acceso
-  const handleCodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const correctCode = "cris2025F";
-    
-    if (accessCode === correctCode) {
-      setIsAuthenticated(true);
-      setCodeError("");
-      toast.success({
-        text: "Acceso autorizado",
-        description: "Bienvenido al panel de administración.",
+  const handleCodeSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isCheckingAccess) return;
+
+    setCodeError('');
+    setIsCheckingAccess(true);
+    try {
+      const { data, error } = await supabase.functions.invoke<{ token: string }>('admin-reservations', {
+        body: { action: 'login', accessCode: accessCode.trim() },
       });
-      // Cargar citas del día cuando se autentica
-      loadTodayAppointments();
-      
-      // Guardar el código si "Recordar" está marcado
-      if (rememberCode) {
-        localStorage.setItem('adminAccessCode', accessCode);
+      if (error || !data?.token) {
+        const status = adminResponseStatus(error);
+        if (status === 401) setCodeError('Código incorrecto. Inténtalo nuevamente.');
+        else if (status === 503) setCodeError('El acceso de administración todavía no está configurado.');
+        else setCodeError('No se pudo verificar el acceso. Inténtalo de nuevo.');
+        return;
       }
-    } else {
-      setCodeError("Código incorrecto. Inténtalo nuevamente.");
-      setAccessCode("");
-      toast.error({
-        text: "Código incorrecto",
-        description: "El código de acceso no es válido.",
-      });
+
+      clearStoredAdminSession();
+      try {
+        const storage = rememberCode ? localStorage : sessionStorage;
+        storage.setItem(adminSessionKey, data.token);
+      } catch {
+        // La sesión sigue disponible mientras el panel esté abierto.
+      }
+      setAdminSession(data.token);
+      setAccessCode('');
+    } finally {
+      setIsCheckingAccess(false);
     }
+  };
+
+  const closeAdminSession = () => {
+    clearStoredAdminSession();
+    setAdminSession(null);
+    setDbReservations([]);
   };
 
   // Función para cargar las citas del día seleccionado
@@ -408,111 +449,33 @@ export const AdminPage = () => {
     }
   };
 
-  // Eliminar reserva en BD
   const deleteDbReservation = async (reservationId: string | number) => {
+    if (!adminSession || deletingDbReservation !== null) return;
+
     setDeletingDbReservation(reservationId);
     try {
-      // Normalizar ID numérico si viene como string
-      const idAsNumber = typeof reservationId === 'string' && /^\d+$/.test(reservationId) ? Number(reservationId) : reservationId;
-      const idAsString = String(reservationId);
+      const { data, error } = await supabase.functions.invoke<{ deleted: boolean }>('admin-reservations', {
+        body: { action: 'delete', token: adminSession, reservationId: String(reservationId) },
+      });
 
-      // 1) Intento por ID (numérico si aplica)
-      const { data: deletedByIdRaw, error: deleteByIdError } = await supabase
-        .from('reservations')
-        .delete()
-        .eq('id', idAsNumber)
-        .select('id');
-
-      if (deleteByIdError) {
-        throw deleteByIdError;
-      }
-
-      const deletedById = deletedByIdRaw as unknown as Array<{ id: string | number }> | null;
-      if (Array.isArray(deletedById) && deletedById.length > 0) {
-        setDbReservations(prev => prev.filter(r => String(r.id) !== String(reservationId)));
-        toast.success({ text: 'Reserva eliminada', description: 'La reserva se ha eliminado de la base de datos.' });
+      if (adminResponseStatus(error) === 401) {
+        closeAdminSession();
+        setCodeError('Tu sesión venció. Ingresa el código de acceso para volver a intentarlo.');
         return;
       }
+      if (error || !data) throw error ?? new Error('Respuesta de eliminación vacía');
 
-      // 1b) Segundo intento por ID en formato string (para columnas bigint)
-      const { data: deletedByIdStrRaw, error: deleteByIdStrError } = await supabase
-        .from('reservations')
-        .delete()
-        .eq('id', idAsString)
-        .select('id');
-
-      if (deleteByIdStrError) {
-        throw deleteByIdStrError;
-      }
-
-      const deletedByIdStr = deletedByIdStrRaw as unknown as Array<{ id: string | number }> | null;
-      if (Array.isArray(deletedByIdStr) && deletedByIdStr.length > 0) {
-        setDbReservations(prev => prev.filter(r => String(r.id) !== String(reservationId)));
-        toast.success({ text: 'Reserva eliminada', description: 'La reserva se ha eliminado de la base de datos.' });
-        return;
-      }
-
-      // 2) Fallback: intentar por combinación única (fecha, hora, nombre, teléfono)
-      const target = dbReservations.find(r => String(r.id) === String(reservationId));
-      if (target) {
-        const { data: deletedByCompositeRaw, error: deleteByCompositeError } = await supabase
-          .from('reservations')
-          .delete()
-          .match({ date: target.date, time: target.time, customer_name: target.customer_name, phone: target.phone });
-
-        if (deleteByCompositeError) {
-          throw deleteByCompositeError;
-        }
-
-        const deletedByComposite = deletedByCompositeRaw as unknown as Array<{ id: string | number }> | null;
-        if (Array.isArray(deletedByComposite) && deletedByComposite.length > 0) {
-          setDbReservations(prev => prev.filter(r => String(r.id) !== String(reservationId)));
-          toast.success({ text: 'Reserva eliminada', description: 'La reserva se ha eliminado de la base de datos.' });
-          return;
-        }
-      }
-
-      // 3) Verificar existencia para avisar si es un tema de permisos RLS o realmente no existe
-      const { data: existing, error: checkError } = await supabase
-        .from('reservations')
-        .select('id')
-        .eq('id', idAsNumber)
-        .maybeSingle();
-
-      if (checkError) {
-        throw checkError;
-      }
-
-      if (existing) {
-        toast.error({
-          text: 'No se pudo eliminar',
-          description: 'La reserva existe pero no se pudo eliminar. Verifica las políticas RLS de DELETE en Supabase.',
-        });
+      setDbReservations(previous => previous.filter(reservation => reservation.id !== reservationId));
+      if (data.deleted) {
+        toast.success({ text: 'Reserva eliminada', description: 'El horario quedó libre en el formulario de reservas.' });
       } else {
-        // Intento de verificación por string
-        const { data: existingStr } = await supabase
-          .from('reservations')
-          .select('id')
-          .eq('id', idAsString)
-          .maybeSingle();
-
-        if (existingStr) {
-          toast.error({
-            text: 'No se pudo eliminar',
-            description: 'La reserva existe (por id string) pero no se pudo eliminar. Verifica las políticas RLS de DELETE en Supabase.',
-          });
-          return;
-        }
-        toast.warning({
-          text: 'No se encontró la reserva',
-          description: 'No se eliminó ningún registro. Verifica el ID de la reserva.',
-        });
+        toast.warning({ text: 'La reserva ya no existe', description: 'La lista de citas se actualizó.' });
       }
     } catch (error) {
       console.error('Error al eliminar reserva BD:', error);
       toast.error({
         text: 'Error al eliminar',
-        description: 'No se pudo eliminar la reserva de la base de datos.',
+        description: 'No se pudo eliminar la reserva. Inténtalo de nuevo.',
       });
     } finally {
       setDeletingDbReservation(null);
@@ -782,9 +745,7 @@ export const AdminPage = () => {
         // También cerrar sesión de Supabase
         await supabase.auth.signOut();
         
-        // Limpiar el código de acceso guardado y estado de autenticación
-        localStorage.removeItem('adminAccessCode');
-        setIsAuthenticated(false);
+        closeAdminSession();
         
         toast.success({
           text: "Cuenta desvinculada",
@@ -849,16 +810,17 @@ export const AdminPage = () => {
                   className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-offset-gray-800 focus:ring-blue-600"
                 />
                 <Label htmlFor="rememberCode" className="ml-2 block text-sm text-gray-300">
-                  Recordar código
+                  Recordar mi sesión
                 </Label>
               </div>
               
               <Button
                 type="submit"
+                disabled={isCheckingAccess}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 flex items-center justify-center gap-2"
               >
                 <Lock className="h-4 w-4" />
-                Verificar Código
+                {isCheckingAccess ? 'Verificando acceso...' : 'Verificar Código'}
               </Button>
             </form>
 
@@ -1115,7 +1077,8 @@ export const AdminPage = () => {
                     </div>
                     <Button
                       onClick={() => deleteDbReservation(reservation.id)}
-                      disabled={deletingDbReservation === reservation.id}
+                      disabled={deletingDbReservation !== null}
+                      aria-label={`Eliminar reserva de ${reservation.customer_name} a las ${reservation.time}`}
                       size="sm"
                       variant="destructive"
                       className="bg-red-600 hover:bg-red-700"
@@ -1133,7 +1096,10 @@ export const AdminPage = () => {
           )}
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+          <button type="button" onClick={closeAdminSession} className="text-sm text-gray-300 hover:text-white hover:underline">
+            Cerrar sesión de administración
+          </button>
           <a
             href="/"
             className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
