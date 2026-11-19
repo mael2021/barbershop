@@ -84,6 +84,7 @@ export const SPECIAL_SCHEDULES: Record<string, SpecialSchedule> = {
   "2026-09-22": EARLY_OPENING_SCHEDULE,
   "2026-09-23": EARLY_OPENING_SCHEDULE,
   "2026-11-15": SUNDAY_10_TO_6_SCHEDULE,
+  "2026-11-22": SUNDAY_10_TO_6_SCHEDULE,
 };
 
 // Convierte un Date a la clave YYYY-MM-DD usada en las constantes de arriba
