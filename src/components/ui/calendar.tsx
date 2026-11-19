@@ -136,23 +136,23 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
   };
 
   return (
-    <div className="flex justify-center items-center w-full py-4">
+    <div className="flex w-full items-center justify-center sm:py-4">
       <div className={cn(
-        "bg-gradient-to-br from-graffiti-dark/90 to-graffiti-dark/95 backdrop-blur-md border border-gray-600/40 rounded-2xl p-2 sm:p-4 max-w-sm w-full shadow-2xl ring-1 ring-white/5",
+        "bg-gradient-to-br from-graffiti-dark/90 to-graffiti-dark/95 backdrop-blur-md border border-gray-600/40 rounded-2xl px-2 py-1.5 sm:p-4 max-w-sm w-full shadow-2xl ring-1 ring-white/5",
         className
       )}>
         {/* Header del calendario */}
-        <div className="flex items-center justify-between mb-4 px-2">
+        <div className="mb-1 flex items-center justify-between px-2 sm:mb-4">
           <button
             type="button"
             aria-label="Mes anterior"
             onClick={goToPreviousMonth}
-            className="group flex size-10 items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 hover:bg-gray-700/40 sm:size-8"
+            className="group flex size-8 items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 hover:bg-gray-700/40"
           >
             <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-white transition-colors" />
           </button>
           
-          <div className="text-center">
+          <div className="flex items-baseline gap-1.5 text-center sm:block">
             <h3 className="text-white font-bold text-base tracking-wide bg-gradient-to-r from-spray-orange to-electric-blue bg-clip-text text-transparent">
               {monthNames[currentMonth.getMonth()]}
             </h3>
@@ -165,19 +165,19 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
             type="button"
             aria-label="Mes siguiente"
             onClick={goToNextMonth}
-            className="group flex size-10 items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 hover:bg-gray-700/40 sm:size-8"
+            className="group flex size-8 items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 hover:bg-gray-700/40"
           >
             <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-white transition-colors" />
           </button>
         </div>
 
         {/* Días de la semana */}
-        <div className="mb-3 grid grid-cols-7 gap-1 sm:px-1">
+        <div className="mb-1.5 grid grid-cols-7 gap-1 sm:mb-3 sm:px-1">
           {dayNames.map((day, index) => (
             <div
               key={day}
               className={cn(
-                "text-center text-xs font-bold py-2 rounded-lg",
+                "rounded-lg py-1 text-center text-xs font-bold sm:py-2",
                 index === 0 ? "text-red-400 bg-red-500/5" : "text-gray-400 bg-gray-700/20"
               )}
             >
@@ -187,9 +187,9 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
         </div>
 
         {/* Días del mes */}
-        <div className="grid grid-cols-7 gap-1 sm:px-1">
+        <div className="grid grid-cols-7 gap-x-1 gap-y-0.5 sm:gap-y-1 sm:px-1">
           {getDaysInMonth(currentMonth).map((date, index) => (
-            <div key={index} className="flex aspect-square min-h-10 items-center justify-center sm:min-h-0">
+            <div key={index} className="flex h-[clamp(2rem,5.7dvh,2.5rem)] items-center justify-center sm:aspect-square sm:h-auto">
               {date && (
                 <button
                   type="button"
@@ -232,10 +232,10 @@ export const Calendar = ({ value, onChange, minDate, className }: CalendarProps)
         </div>
 
         {/* Mensaje informativo más elegante */}
-        <div className="mt-4 flex justify-center">
-          <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-800/40 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-600/30">
+        <div className="mt-1 flex justify-center sm:mt-4">
+          <div className="inline-flex items-center gap-2 text-xs text-gray-400 sm:rounded-full sm:border sm:border-gray-600/30 sm:bg-gray-800/40 sm:px-4 sm:py-2 sm:backdrop-blur-sm">
             <div className="w-2 h-2 bg-red-500 rounded-full opacity-70 animate-pulse"></div>
-            <span className="font-medium">Domingos cerrado</span>
+            <span className="font-medium">Domingos cerrados</span>
           </div>
         </div>
       </div>

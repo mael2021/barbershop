@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock, User, X, ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
 import { supabase } from "@/supabase/client";
 import { services, DESVANECIDO_LAVADO_AUTO, DESVANECIDO_LAVADO_AUTO_CALENDAR_COLOR_ID } from "@/consts/services";
@@ -38,6 +38,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<Set<string>>(new Set());
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingFormSchema),
     mode: "onTouched",
@@ -56,6 +57,10 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   const formData = watch();
   const currentFields = stepFields[currentStep - 1];
   const isCurrentStepValid = currentFields.every(field => formData[field].length > 0);
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [currentStep]);
 
   const timeSlots = [
     "10:00 AM",
@@ -418,9 +423,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border-gray-600 bg-graffiti-gray">
-        <form noValidate onSubmit={event => {
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-4">
+      <Card className="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden border-gray-600 bg-graffiti-gray sm:max-h-[90dvh]">
+        <form className="flex min-h-0 flex-col" noValidate onSubmit={event => {
           event.preventDefault();
           if (currentStep < stepFields.length) {
             void nextStep();
@@ -428,42 +433,43 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             void handleSubmit(onSubmit)(event);
           }
         }}>
-          <CardHeader className="relative border-b border-gray-600 p-6">
+          <CardHeader className="relative shrink-0 space-y-1 border-b border-gray-600 px-10 py-2 sm:space-y-1.5 sm:p-6">
             <Button
               type="button"
               variant="ghost"
               size="icon"
               aria-label="Cerrar formulario"
               onClick={onClose}
-              className="absolute top-4 right-4 cursor-pointer text-gray-400 hover:text-white"
+              className="absolute top-1 right-1 cursor-pointer text-gray-400 hover:text-white sm:top-4 sm:right-4"
             >
               <X className="h-4 w-4" />
             </Button>
 
-            <CardTitle className="text-center text-3xl text-white uppercase">Reserva tu cita</CardTitle>
-            <CardDescription className="text-center text-white">
-              Paso {currentStep} de {stepFields.length} - ¡Vamos a que te veas genial!
-            </CardDescription>
-
-            {/* Progress Bar */}
-            <div className="mt-4 h-2 w-full rounded-full bg-gray-700">
-              <div
-                className="h-2 rounded-full bg-gradient-to-r from-spray-orange to-electric-blue transition-all duration-300"
-                style={{ width: `${(currentStep / stepFields.length) * 100}%` }}
-              ></div>
+            <CardTitle className="text-center text-xl leading-tight text-white uppercase sm:text-3xl sm:leading-none">Reserva tu cita</CardTitle>
+            <div className="flex items-center gap-2 sm:block">
+              <CardDescription className="shrink-0 text-center text-xs text-white sm:text-sm">
+                Paso {currentStep} de {stepFields.length}
+                <span className="hidden sm:inline"> - ¡Vamos a que te veas genial!</span>
+              </CardDescription>
+              <div className="h-1.5 w-full rounded-full bg-gray-700 sm:mt-4 sm:h-2">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-spray-orange to-electric-blue transition-all duration-300"
+                  style={{ width: `${(currentStep / stepFields.length) * 100}%` }}
+                ></div>
+              </div>
             </div>
           </CardHeader>
 
-          <CardContent className={currentStep === 2 ? "px-3 sm:px-6" : undefined}>
+          <CardContent ref={contentRef} className="min-h-0 overflow-y-auto overscroll-contain px-3 py-2 sm:px-6 sm:pt-6 sm:pb-8">
             {/* Step 1: Service Selection */}
             {currentStep === 1 && (
-              <div className="animate-fade-in space-y-6">
+              <div className="animate-fade-in space-y-3 sm:space-y-6">
                 <div className="text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-spray-orange to-electric-blue">
+                  <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-spray-orange to-electric-blue sm:flex">
                     <Calendar className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="mb-2 text-2xl font-bold text-white">Elige tus servicios</h3>
-                  <p className="text-white">¿Qué estilos vamos a elegir hoy?</p>
+                  <h3 className="text-lg font-bold text-white sm:mb-2 sm:text-2xl">Elige tus servicios</h3>
+                  <p className="hidden text-white sm:block">¿Qué estilos vamos a elegir hoy?</p>
                 </div>
 
                 <div className="space-y-4">
@@ -503,8 +509,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center p-8 text-gray-400">
-                      <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                    <div className="p-3 text-center text-sm text-gray-400 sm:p-8 sm:text-base">
+                      <Calendar className="mx-auto mb-4 hidden h-12 w-12 opacity-50 sm:block" />
                       <p>No has seleccionado ningún servicio</p>
                     </div>
                   )}
@@ -552,24 +558,22 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
             {/* Step 2: Date Selection */}
             {currentStep === 2 && (
-              <div className="animate-fade-in space-y-6">
+              <div className="animate-fade-in space-y-2.5 sm:space-y-6">
                 <div className="text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-neon-green to-urban-purple">
+                  <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-neon-green to-urban-purple sm:flex">
                     <User className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="mb-2 text-2xl font-bold text-white">Selecciona tu fecha</h3>
-                  <p className="text-white">¿Cuándo harémos tu cita?</p>
+                  <h3 className="text-lg font-bold text-white sm:mb-2 sm:text-2xl">Selecciona tu fecha</h3>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2.5 sm:space-y-4">
                   {getUpcomingClosedDateGroups().map((group) => (
                     <div
                       key={group[0]}
                       role="status"
-                      className="rounded-lg border border-red-500/30 bg-red-950/40 p-3 text-center text-xs text-red-200 sm:text-sm"
+                      className="rounded-lg border border-red-500/30 bg-red-950/40 px-2 py-1.5 text-center text-xs text-red-200 sm:p-3 sm:text-sm"
                     >
-                      <span className="font-bold text-red-400 uppercase">Aviso:</span> Los días{" "}
-                      <span className="font-semibold text-white">{formatClosedDatesGroup(group)}</span> estaremos cerrados.
+                      Cerramos los días <span className="font-semibold text-white">{formatClosedDatesGroup(group)}</span>.
                     </div>
                   ))}
 
@@ -586,13 +590,13 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
 
             {/* Step 3: Time Selection */}
             {currentStep === 3 && (
-              <div className="animate-fade-in space-y-6">
+              <div className="animate-fade-in space-y-3 sm:space-y-6">
                 <div className="text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-hot-pink to-spray-orange">
+                  <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-hot-pink to-spray-orange sm:flex">
                     <Clock className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="mb-2 text-2xl font-bold text-white">Selecciona tu hora</h3>
-                  <p className="text-white">
+                  <h3 className="mb-1 text-lg font-bold text-white sm:mb-2 sm:text-2xl">Selecciona tu hora</h3>
+                  <p className="text-xs text-white sm:text-base">
                     {(() => {
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
                       const specialSchedule = getSpecialSchedule(formData.date);
@@ -613,8 +617,8 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 {isLoadingSlots ? (
                   <div className="text-center text-white">Cargando horarios disponibles...</div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                       {(() => {
                         // Determinar qué horarios mostrar según el día seleccionado
                         if (!formData.date) return timeSlots;
@@ -634,7 +638,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                                 : isAvailable
                                   ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
                                   : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
-                            } cursor-pointer transition-all duration-300`}
+                            } h-9 cursor-pointer px-2 transition-all duration-300 sm:h-10 sm:px-4`}
                           >
                             {time}
                             {!isAvailable && " (Ocupado)"}
@@ -654,7 +658,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                       if (isSunday || getSpecialSchedule(formData.date) || CLOSED_DATES.includes(formData.date)) return null;
                       
                       return (
-                        <div className="mt-6 pt-4 border-t border-gray-600/30">
+                        <div className="mt-3 border-t border-gray-600/30 pt-2 sm:mt-6 sm:pt-4">
                           <div className="text-center mb-2">
                             <p className="text-xs text-gray-400">¿Necesitas una cita después de las 8:00 PM?</p>
                           </div>
@@ -678,52 +682,51 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             <div hidden={currentStep !== 4}>
               <ContactFields form={form} isActive={currentStep === 4} />
               {currentStep === 4 && (
-                <div className="mt-6">
+                <div className="mt-2 sm:mt-6">
                   <BookingSummary services={formData.services} date={formData.date} time={formData.time} />
                 </div>
               )}
             </div>
-
-            {/* Navigation Buttons */}
-            <div className="mt-8 flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 1}
-                className="cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange disabled:opacity-50"
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Atrás
-              </Button>
-
-              {currentStep < stepFields.length ? (
-                <Button
-                  key="next-step"
-                  type="button"
-                  onClick={nextStep}
-                  disabled={!isCurrentStepValid}
-                  className={`cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 ${
-                    !isCurrentStepValid ? "opacity-50" : ""
-                  }`}
-                >
-                  Siguiente
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  key="confirm-booking"
-                  type="submit"
-                  disabled={!isCurrentStepValid || isSubmitting}
-                  className={`bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 ${
-                    !isCurrentStepValid || isSubmitting ? "opacity-50" : ""
-                  }`}
-                >
-                  {isSubmitting ? "Creando cita..." : "Confirmar cita 🔥"}
-                </Button>
-              )}
-            </div>
           </CardContent>
+
+          <CardFooter className="shrink-0 justify-between gap-2 border-t border-gray-600 px-3 py-2 sm:border-t-0 sm:px-6 sm:pt-0 sm:pb-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              className="h-11 cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange disabled:opacity-50 sm:h-10"
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Atrás
+            </Button>
+
+            {currentStep < stepFields.length ? (
+              <Button
+                key="next-step"
+                type="button"
+                onClick={nextStep}
+                disabled={!isCurrentStepValid}
+                className={`h-11 cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 ${
+                  !isCurrentStepValid ? "opacity-50" : ""
+                }`}
+              >
+                Siguiente
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                key="confirm-booking"
+                type="submit"
+                disabled={!isCurrentStepValid || isSubmitting}
+                className={`h-11 bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 ${
+                  !isCurrentStepValid || isSubmitting ? "opacity-50" : ""
+                }`}
+              >
+                {isSubmitting ? "Creando cita..." : "Confirmar cita 🔥"}
+              </Button>
+            )}
+          </CardFooter>
         </form>
       </Card>
     </div>

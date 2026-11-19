@@ -36,22 +36,22 @@ export const BookingSummary = ({ services: selectedServices, date, time }: Booki
   };
 
   return (
-    <div className="rounded-lg border border-gray-600 bg-graffiti-dark p-4">
-      <h4 className="graffiti-text graffiti-shadow mb-3 text-2xl font-bold text-white uppercase">Resumen de la cita</h4>
-      <div className="space-y-2">
+    <div className="rounded-lg border border-gray-600 bg-graffiti-dark p-2.5 sm:p-4">
+      <h4 className="graffiti-text graffiti-shadow mb-1 text-base font-bold text-white uppercase sm:mb-3 sm:text-2xl">Resumen de la cita</h4>
+      <div className="space-y-1 sm:space-y-2">
         <div>
-          <span className="text-sm font-bold text-gray-300 uppercase">Servicios:</span>
+          <span className="hidden text-sm font-bold text-gray-300 uppercase sm:inline">Servicios:</span>
           <div className="mt-1 space-y-1">
             {selectedServices.map((serviceName) => {
               const service = services.find(s => s.name === serviceName);
               return (
-                <div key={serviceName} className="flex justify-between text-sm">
+                <div key={serviceName} className="flex justify-between gap-2 text-xs sm:text-sm">
                   <span className="text-white">{serviceName}</span>
                   <span className="text-spray-orange">${service?.price} MXN</span>
                 </div>
               );
             })}
-            <div className="border-t border-gray-600 pt-1 flex justify-between font-bold">
+            <div className="flex justify-between gap-2 border-t border-gray-600 pt-1 text-sm font-bold sm:text-base">
               <span className="text-white">Total:</span>
               <span className="text-spray-orange">${totalPrice} MXN</span>
             </div>
