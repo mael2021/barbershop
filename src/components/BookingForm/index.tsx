@@ -2,23 +2,23 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, User, X, ChevronLeft, ChevronRight, Plus, MessageCircle } from "lucide-react";
+import { Calendar, Clock, User, X, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import { supabase } from "@/supabase/client";
 import { services, DESVANECIDO_LAVADO_AUTO, DESVANECIDO_LAVADO_AUTO_CALENDAR_COLOR_ID } from "@/consts/services";
 import { toast } from "@pheralb/toast";
 import { BookingSummary } from "@/components";
+import { ClosedDatesNotice } from "@/components/ClosedDatesNotice";
 import { celebrateBooking } from "@/lib/confetti";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import {
   CLOSED_DATES,
-  formatClosedDatesGroup,
   getSpecialSchedule,
   getUpcomingClosedDateGroups,
   toDateKey,
 } from "@/consts/schedule";
 import { ContactFields } from "./ContactFields";
+import { ServicePicker } from "./ServicePicker";
 import { forgetBookingContact, rememberBookingContact } from "./rememberedContact";
 import { bookingFormSchema, type BookingFormData } from "./schema";
 
@@ -515,42 +515,11 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                     </div>
                   )}
 
-                  {/* Botón para agregar servicio */}
-                  <div className="text-center">
-                    <Select
-                      value=""
-                      onValueChange={(value) => {
-                        if (value) addService(value);
-                      }}
-                    >
-                      <SelectTrigger className="border-gray-600 bg-graffiti-dark text-white hover:border-spray-orange transition-colors">
-                        <div className="flex items-center gap-2">
-                          <Plus className="h-4 w-4 text-spray-orange" />
-                          <span>Agregar servicio</span>
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent className="border-gray-600 bg-graffiti-dark">
-                        {services
-                          .filter(service => 
-                            !excludedServices.includes(service.name) && 
-                            !formData.services?.includes(service.name)
-                          )
-                          .map((service) => (
-                            <SelectItem 
-                              key={service.name} 
-                              value={service.name} 
-                              className="text-white hover:bg-gray-600 focus:bg-gray-600"
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-medium">{service.name}</span>
-                                <span className="text-sm text-gray-400">${service.price} MXN • {service.duration}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
+                  <ServicePicker
+                    services={services.filter(service => !excludedServices.includes(service.name) && !formData.services.includes(service.name))}
+                    onSelect={addService}
+                  />
+
                   {errors.services && <p className="mt-1 text-sm text-red-500">{errors.services.message}</p>}
                 </div>
               </div>
@@ -567,15 +536,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 </div>
 
                 <div className="space-y-2.5 sm:space-y-4">
-                  {getUpcomingClosedDateGroups().map((group) => (
-                    <div
-                      key={group[0]}
-                      role="status"
-                      className="rounded-lg border border-red-500/30 bg-red-950/40 px-2 py-1.5 text-center text-xs text-red-200 sm:p-3 sm:text-sm"
-                    >
-                      Cerramos los días <span className="font-semibold text-white">{formatClosedDatesGroup(group)}</span>.
-                    </div>
-                  ))}
+                  {getUpcomingClosedDateGroups().map(group => <ClosedDatesNotice key={group[0]} dates={group} />)}
 
                   <CalendarComponent
                     value={formData.date}

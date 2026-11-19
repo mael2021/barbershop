@@ -1,5 +1,6 @@
 import { services, DESVANECIDO_LAVADO_AUTO } from "@/consts/services";
-import { formatClosedDatesGroup, getUpcomingClosedDateGroups } from "@/consts/schedule";
+import { getUpcomingClosedDateGroups } from "@/consts/schedule";
+import { ClosedDatesNotice } from "@/components/ClosedDatesNotice";
 
 export const AnnouncementBanner = ({ onBookService }: { onBookService: (service: string) => void }) => {
   const combo = services.find((s) => s.name === DESVANECIDO_LAVADO_AUTO);
@@ -9,25 +10,13 @@ export const AnnouncementBanner = ({ onBookService }: { onBookService: (service:
 
   return (
     <div>
-      {closedGroups.map((group) => {
-        const formattedDates = formatClosedDatesGroup(group);
-        return (
-          <div
-            key={group[0]}
-            role="status"
-            className="-mx-4 block w-[calc(100%+2rem)] border-b border-red-500/30 bg-red-950/60 px-4 py-2.5 backdrop-blur-sm"
-          >
-            <span className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2 text-center text-xs sm:gap-3 sm:text-sm">
-              <span className="rounded-full border border-red-500/40 bg-red-500/20 px-2.5 py-0.5 text-[10px] font-bold tracking-widest text-red-300 uppercase">
-                Aviso
-              </span>
-              <span className="text-gray-200">
-                Los días <span className="font-bold text-white">{formattedDates}</span> estaremos cerrados.
-              </span>
-            </span>
+      {closedGroups.length > 0 && (
+        <div className="-mx-4 border-b border-white/10 bg-black/30 px-4 py-2.5">
+          <div className="mx-auto flex max-w-4xl flex-wrap justify-center gap-2">
+            {closedGroups.map(group => <ClosedDatesNotice key={group[0]} dates={group} />)}
           </div>
-        );
-      })}
+        </div>
+      )}
       {combo && (
         <button
           type="button"

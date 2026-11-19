@@ -1,9 +1,9 @@
 import {
-  formatClosedDatesGroup,
   formatSpecialDate,
   getUpcomingClosedDateGroups,
   getUpcomingSpecialSchedules,
 } from "@/consts/schedule";
+import { ClosedDatesNotice } from "@/components/ClosedDatesNotice";
 
 export const InfoSection = () => {
   const specialSchedules = getUpcomingSpecialSchedules();
@@ -44,11 +44,7 @@ export const InfoSection = () => {
               ⚡ {formatSpecialDate(date)}: {schedule.hours}
             </p>
           ))}
-          {closedGroups.map((group) => (
-            <p key={group[0]} className="text-center text-sm font-semibold text-red-400">
-              🚫 Cerrado: {formatClosedDatesGroup(group)}
-            </p>
-          ))}
+          {closedGroups.map(group => <ClosedDatesNotice key={group[0]} dates={group} />)}
         </article>
 
         <article className="flex flex-col items-center gap-y-2">

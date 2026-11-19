@@ -130,22 +130,22 @@ export const getUpcomingClosedDateGroups = (): string[][] => {
   return groups.filter((group) => group[group.length - 1] >= todayKey);
 };
 
-// Formatea un grupo de fechas cerradas (ej. ["2026-11-23", ..., "2026-11-28"] -> "23, 24, 25, 26, 27 y 28 de noviembre")
+// Formatea los días consecutivos de un cierre como un rango.
 export const formatClosedDatesGroup = (dates: string[]): string => {
   if (dates.length === 0) return "";
 
-  const parsed = dates.map((d) => new Date(d + "T00:00:00"));
-  const days = parsed.map((d) => d.getDate());
-  const months = Array.from(
-    new Set(parsed.map((d) => d.toLocaleDateString("es-MX", { month: "long" })))
-  );
+  const start = new Date(dates[0] + "T00:00:00");
+  const end = new Date(dates[dates.length - 1] + "T00:00:00");
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const formatter = new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: sameYear ? undefined : "numeric",
+  });
 
-  const daysText =
-    days.length === 1
-      ? `${days[0]}`
-      : `${days.slice(0, -1).join(", ")} y ${days[days.length - 1]}`;
-
-  return `${daysText} de ${months.join(" / ")}`;
+  if (dates.length === 1) return `El ${formatter.format(start)}`;
+  const firstDay = sameYear && start.getMonth() === end.getMonth() ? start.getDate() : formatter.format(start);
+  return `Del ${firstDay} al ${formatter.format(end)}`;
 };
 
 // "2026-08-29" -> "Sábado 29 de agosto"
