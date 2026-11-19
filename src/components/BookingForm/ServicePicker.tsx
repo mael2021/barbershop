@@ -6,7 +6,7 @@ import type { Service } from "@/types/service";
 const ServiceOption = ({ service }: { service: Service }) => (
   <span className="flex flex-col">
     <span className="font-medium text-white">{service.name}</span>
-    <span className="text-xs text-gray-400 sm:text-sm">
+    <span className="text-xs text-gray-300 sm:text-sm sm:text-gray-400">
       {service.isCustomPriced ? service.customPrice || "Precio a consultar" : `$${service.price} MXN`} · {service.duration}
     </span>
   </span>
@@ -27,7 +27,10 @@ export const ServicePicker = ({ services, onSelect }: { services: Service[]; onS
           </span>
           <ChevronDown aria-hidden="true" className="size-4 text-gray-400 transition-transform group-open:rotate-180" />
         </summary>
-        <ul aria-label="Servicios disponibles" className="mt-2 max-h-[min(14rem,36dvh)] divide-y divide-gray-700 overflow-y-auto overscroll-contain rounded-lg border border-gray-600 bg-graffiti-dark [scrollbar-color:var(--color-gray-500)_transparent] [scrollbar-width:thin]">
+        <ul
+          aria-label="Servicios disponibles"
+          className="relative mt-2 max-h-[min(14rem,36dvh)] divide-y divide-white/20 overflow-y-auto overscroll-contain rounded-lg border border-spray-orange/45 bg-graffiti-dark [scrollbar-color:var(--color-gray-500)_transparent] [scrollbar-width:thin]"
+        >
           {services.map(service => (
             <li key={service.name}>
               <button

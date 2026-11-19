@@ -90,17 +90,17 @@ export const ContactFields = ({ form, isActive }: { form: UseFormReturn<BookingF
   };
 
   return (
-    <div className="animate-fade-in space-y-2 sm:space-y-6">
+    <div className="animate-fade-in space-y-2 booking-roomy:space-y-2.5 sm:space-y-6">
       <div className="text-center">
         <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-urban-purple to-neon-green sm:flex">
           <Phone className="h-8 w-8 text-white" />
         </div>
-        <h3 className="text-base font-bold text-white uppercase sm:mb-2 sm:text-2xl">Tus datos</h3>
+        <h3 className="text-base font-bold text-white uppercase booking-roomy:text-lg sm:mb-2 sm:text-2xl">Tus datos</h3>
       </div>
 
-      <div className="space-y-2 sm:space-y-4">
-        <div className="flex flex-col gap-0.5 sm:block">
-          <Label htmlFor="booking-email" className="text-xs font-bold text-white uppercase sm:text-sm">Correo electrónico</Label>
+      <div className="space-y-2 booking-roomy:space-y-2.5 sm:space-y-4">
+        <div className="flex flex-col gap-0.5 booking-roomy:gap-1 sm:block">
+          <Label htmlFor="booking-email" className="text-xs font-bold text-white uppercase booking-roomy:text-[0.8125rem] sm:text-sm">Correo electrónico</Label>
           <Input
             id="booking-email"
             type="email"
@@ -112,7 +112,7 @@ export const ContactFields = ({ form, isActive }: { form: UseFormReturn<BookingF
               onBlur: event => { void lookupContact(event.target.value); },
             })}
             placeholder="Ingresa tu correo"
-            className="h-9 border-gray-600 bg-graffiti-dark px-2 text-white placeholder-gray-400 sm:h-10 sm:px-3"
+            className="h-9 border-gray-600 bg-graffiti-dark px-2 text-white placeholder-gray-400 booking-roomy:h-11 booking-roomy:px-3 sm:h-10 sm:px-3"
           />
           {errors.email && <p role="alert" className="mt-1 text-sm text-red-500">{errors.email.message}</p>}
         </div>
@@ -121,8 +121,8 @@ export const ContactFields = ({ form, isActive }: { form: UseFormReturn<BookingF
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-4">
           {fields.map(({ name, label, autoComplete, placeholder }) => (
-            <div key={name} className="flex min-w-0 flex-col gap-0.5 sm:block">
-              <Label htmlFor={`booking-${name}`} className="text-xs font-bold text-white uppercase sm:text-sm">{label}</Label>
+            <div key={name} className="flex min-w-0 flex-col gap-0.5 booking-roomy:gap-1 sm:block">
+              <Label htmlFor={`booking-${name}`} className="text-xs font-bold text-white uppercase booking-roomy:text-[0.8125rem] sm:text-sm">{label}</Label>
               <Input
                 id={`booking-${name}`}
                 {...register(name)}
@@ -130,14 +130,14 @@ export const ContactFields = ({ form, isActive }: { form: UseFormReturn<BookingF
                 autoComplete={autoComplete}
                 placeholder={placeholder}
                 aria-invalid={Boolean(errors[name])}
-                className="h-9 border-gray-600 bg-graffiti-dark px-2 text-white placeholder-gray-400 placeholder:text-xs sm:h-10 sm:px-3 sm:placeholder:text-sm"
+                className="h-9 border-gray-600 bg-graffiti-dark px-2 text-white placeholder-gray-400 placeholder:text-xs booking-roomy:h-11 booking-roomy:px-3 booking-roomy:placeholder:text-sm sm:h-10 sm:px-3 sm:placeholder:text-sm"
               />
               {errors[name] && <p role="alert" className="mt-1 text-sm text-red-500">{errors[name].message}</p>}
             </div>
           ))}
         </div>
 
-        <label className="relative flex cursor-pointer items-start gap-2 rounded-xl border border-gray-600 bg-graffiti-dark/70 p-2 transition-colors hover:border-spray-orange/70 has-checked:border-spray-orange/70 has-checked:bg-spray-orange/10 sm:gap-3 sm:p-4">
+        <label className="relative flex cursor-pointer items-start gap-2 rounded-xl border border-gray-600 bg-graffiti-dark/70 p-2 transition-colors hover:border-spray-orange/70 has-checked:border-spray-orange/70 has-checked:bg-spray-orange/10 booking-roomy:gap-2.5 booking-roomy:p-3 sm:gap-3 sm:p-4">
           <input
             type="checkbox"
             {...register("rememberContact")}

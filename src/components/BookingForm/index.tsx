@@ -423,7 +423,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-4">
+    <div className="fixed inset-x-0 top-0 z-50 flex h-dvh items-center justify-center bg-black/80 p-2 backdrop-blur-sm [container-name:booking-viewport] [container-type:size] sm:p-4">
       <Card className="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden border-gray-600 bg-graffiti-gray sm:max-h-[90dvh]">
         <form className="flex min-h-0 flex-col" noValidate onSubmit={event => {
           event.preventDefault();
@@ -433,7 +433,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             void handleSubmit(onSubmit)(event);
           }
         }}>
-          <CardHeader className="relative shrink-0 space-y-1 border-b border-gray-600 px-10 py-2 sm:space-y-1.5 sm:p-6">
+          <CardHeader className="relative shrink-0 space-y-1 border-b border-gray-600 px-10 py-2 booking-roomy:py-2.5 sm:space-y-1.5 sm:p-6">
             <Button
               type="button"
               variant="ghost"
@@ -445,9 +445,9 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
               <X className="h-4 w-4" />
             </Button>
 
-            <CardTitle className="text-center text-xl leading-tight text-white uppercase sm:text-3xl sm:leading-none">Reserva tu cita</CardTitle>
+            <CardTitle className="text-center text-xl leading-tight text-white uppercase booking-roomy:text-2xl sm:text-3xl sm:leading-none">Reserva tu cita</CardTitle>
             <div className="flex items-center gap-2 sm:block">
-              <CardDescription className="shrink-0 text-center text-xs text-white sm:text-sm">
+              <CardDescription className="shrink-0 text-center text-xs text-white booking-roomy:text-sm sm:text-sm">
                 Paso {currentStep} de {stepFields.length}
                 <span className="hidden sm:inline"> - ¡Vamos a que te veas genial!</span>
               </CardDescription>
@@ -460,15 +460,15 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             </div>
           </CardHeader>
 
-          <CardContent ref={contentRef} className="min-h-0 overflow-y-auto overscroll-contain px-3 py-2 sm:px-6 sm:pt-6 sm:pb-8">
+          <CardContent ref={contentRef} className="min-h-0 overflow-y-auto overscroll-contain px-3 py-2 booking-roomy:px-4 booking-roomy:py-2.5 sm:px-6 sm:pt-6 sm:pb-8">
             {/* Step 1: Service Selection */}
             {currentStep === 1 && (
-              <div className="animate-fade-in space-y-3 sm:space-y-6">
+              <div className="animate-fade-in space-y-3 booking-roomy:space-y-4 sm:space-y-6">
                 <div className="text-center">
                   <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-spray-orange to-electric-blue sm:flex">
                     <Calendar className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-lg font-bold text-white sm:mb-2 sm:text-2xl">Elige tus servicios</h3>
+                  <h3 className="text-lg font-bold text-white booking-roomy:text-xl sm:mb-2 sm:text-2xl">Elige tus servicios</h3>
                   <p className="hidden text-white sm:block">¿Qué estilos vamos a elegir hoy?</p>
                 </div>
 
@@ -532,7 +532,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-neon-green to-urban-purple sm:flex">
                     <User className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-lg font-bold text-white sm:mb-2 sm:text-2xl">Selecciona tu fecha</h3>
+                  <h3 className="text-lg font-bold text-white booking-roomy:text-xl sm:mb-2 sm:text-2xl">Selecciona tu fecha</h3>
                 </div>
 
                 <div className="space-y-2.5 sm:space-y-4">
@@ -556,7 +556,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                   <div className="mx-auto mb-4 hidden h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-hot-pink to-spray-orange sm:flex">
                     <Clock className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="mb-1 text-lg font-bold text-white sm:mb-2 sm:text-2xl">Selecciona tu hora</h3>
+                  <h3 className="mb-1 text-lg font-bold text-white booking-roomy:text-xl sm:mb-2 sm:text-2xl">Selecciona tu hora</h3>
                   <p className="text-xs text-white sm:text-base">
                     {(() => {
                       if (!formData.date) return "Horarios disponibles (citas de 1 hora)";
@@ -599,7 +599,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                                 : isAvailable
                                   ? "border-gray-600 text-gray-300 hover:border-spray-orange hover:text-spray-orange"
                                   : "cursor-not-allowed border-gray-600 text-gray-500 opacity-50"
-                            } h-9 cursor-pointer px-2 transition-all duration-300 sm:h-10 sm:px-4`}
+                            } h-9 cursor-pointer px-2 transition-all duration-300 booking-roomy:h-10 sm:h-10 sm:px-4`}
                           >
                             {time}
                             {!isAvailable && " (Ocupado)"}
@@ -643,20 +643,20 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
             <div hidden={currentStep !== 4}>
               <ContactFields form={form} isActive={currentStep === 4} />
               {currentStep === 4 && (
-                <div className="mt-2 sm:mt-6">
+                <div className="mt-2 booking-roomy:mt-2.5 sm:mt-6">
                   <BookingSummary services={formData.services} date={formData.date} time={formData.time} />
                 </div>
               )}
             </div>
           </CardContent>
 
-          <CardFooter className="shrink-0 justify-between gap-2 border-t border-gray-600 px-3 py-2 sm:border-t-0 sm:px-6 sm:pt-0 sm:pb-6">
+          <CardFooter className="shrink-0 justify-between gap-2 border-t border-gray-600 px-3 py-2 booking-roomy:px-4 booking-roomy:py-2.5 sm:border-t-0 sm:px-6 sm:pt-0 sm:pb-6">
             <Button
               type="button"
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="h-11 cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange disabled:opacity-50 sm:h-10"
+              className="h-11 cursor-pointer border-gray-600 text-gray-300 uppercase hover:border-spray-orange hover:text-spray-orange disabled:opacity-50 booking-roomy:h-12 booking-roomy:text-sm sm:h-10"
             >
               <ChevronLeft className="mr-1 h-4 w-4" />
               Atrás
@@ -668,7 +668,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 type="button"
                 onClick={nextStep}
                 disabled={!isCurrentStepValid}
-                className={`h-11 cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 ${
+                className={`h-11 cursor-pointer bg-gradient-to-r from-spray-orange to-electric-blue text-white uppercase hover:from-electric-blue hover:to-spray-orange disabled:cursor-not-allowed disabled:opacity-50 booking-roomy:h-12 booking-roomy:text-sm sm:h-10 ${
                   !isCurrentStepValid ? "opacity-50" : ""
                 }`}
               >
@@ -680,7 +680,7 @@ export const BookingForm = ({ isOpen, onClose, preSelectedService, excludedServi
                 key="confirm-booking"
                 type="submit"
                 disabled={!isCurrentStepValid || isSubmitting}
-                className={`h-11 bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 ${
+                className={`h-11 bg-gradient-to-r from-neon-green to-urban-purple font-bold text-white uppercase hover:from-urban-purple hover:to-neon-green disabled:cursor-not-allowed disabled:opacity-50 booking-roomy:h-12 booking-roomy:text-sm sm:h-10 ${
                   !isCurrentStepValid || isSubmitting ? "opacity-50" : ""
                 }`}
               >

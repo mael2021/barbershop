@@ -36,8 +36,8 @@ export const BookingSummary = ({ services: selectedServices, date, time }: Booki
   };
 
   return (
-    <div className="rounded-lg border border-gray-600 bg-graffiti-dark p-2.5 sm:p-4">
-      <h4 className="graffiti-text graffiti-shadow mb-1 text-base font-bold text-white uppercase sm:mb-3 sm:text-2xl">Resumen de la cita</h4>
+    <div className="rounded-lg border border-gray-600 bg-graffiti-dark p-2.5 booking-roomy:p-3 sm:p-4">
+      <h4 className="graffiti-text graffiti-shadow mb-1 text-base font-bold text-white uppercase booking-roomy:text-lg sm:mb-3 sm:text-2xl">Resumen de la cita</h4>
       <div className="space-y-1 sm:space-y-2">
         <div>
           <span className="hidden text-sm font-bold text-gray-300 uppercase sm:inline">Servicios:</span>
@@ -45,7 +45,7 @@ export const BookingSummary = ({ services: selectedServices, date, time }: Booki
             {selectedServices.map((serviceName) => {
               const service = services.find(s => s.name === serviceName);
               return (
-                <div key={serviceName} className="flex justify-between gap-2 text-xs sm:text-sm">
+                <div key={serviceName} className="flex justify-between gap-2 text-xs booking-roomy:text-sm sm:text-sm">
                   <span className="text-white">{serviceName}</span>
                   <span className="text-spray-orange">${service?.price} MXN</span>
                 </div>
